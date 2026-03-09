@@ -97,7 +97,7 @@ const ChatBot = () => {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 w-14 h-14 chatbot-bubble rounded-full flex items-center justify-center z-50"
+            className="fixed bottom-20 right-6 w-14 h-14 chatbot-bubble rounded-full flex items-center justify-center z-[9999]"
             data-testid="chatbot-toggle"
           >
             <Bot className="w-6 h-6 text-white" />
@@ -117,7 +117,7 @@ const ChatBot = () => {
               height: isMinimized ? 60 : 500
             }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 right-6 w-[380px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-50"
+            className="fixed bottom-20 right-6 w-[380px] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-[9999]"
             style={{ maxHeight: '80vh' }}
           >
             {/* Header */}
