@@ -1,53 +1,112 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import React from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute';
+import AuthCallback from './components/AuthCallback';
+import ChatBot from './components/chatbot/ChatBot';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+// Pages
+import LandingPage from './pages/landing/LandingPage';
+import AuthPage from './pages/auth/AuthPage';
+import DashboardPage from './pages/admin/DashboardPage';
+import AnalyticsPage from './pages/admin/AnalyticsPage';
+import InventoryPage from './pages/admin/InventoryPage';
+import CustomersPage from './pages/admin/CustomersPage';
+import SalesPage from './pages/admin/SalesPage';
+import SuppliersPage from './pages/admin/SuppliersPage';
+import StorePage from './pages/store/StorePage';
+import CartPage from './pages/customer/CartPage';
+import OrdersPage from './pages/customer/OrdersPage';
+import WishlistPage from './pages/customer/WishlistPage';
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
+import './App.css';
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
+function AppRouter() {
+  const location = useLocation();
+
+  // Check URL fragment for session_id (handles OAuth callback)
+  if (location.hash?.includes('session_id=')) {
+    return <AuthCallback />;
+  }
 
   return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
+    <>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/auth" element={<AuthPage />} />
+
+        {/* Admin Routes */}
+        <Route path="/dashboard" element={
+          <AdminRoute><DashboardPage /></AdminRoute>
+        } />
+        <Route path="/analytics" element={
+          <AdminRoute><AnalyticsPage /></AdminRoute>
+        } />
+        <Route path="/admin/inventory" element={
+          <AdminRoute><InventoryPage /></AdminRoute>
+        } />
+        <Route path="/admin/customers" element={
+          <AdminRoute><CustomersPage /></AdminRoute>
+        } />
+        <Route path="/admin/sales" element={
+          <AdminRoute><SalesPage /></AdminRoute>
+        } />
+        <Route path="/admin/suppliers" element={
+          <AdminRoute><SuppliersPage /></AdminRoute>
+        } />
+
+        {/* Customer Routes */}
+        <Route path="/store" element={
+          <ProtectedRoute><StorePage /></ProtectedRoute>
+        } />
+        <Route path="/cart" element={
+          <ProtectedRoute><CartPage /></ProtectedRoute>
+        } />
+        <Route path="/orders" element={
+          <ProtectedRoute><OrdersPage /></ProtectedRoute>
+        } />
+        <Route path="/wishlist" element={
+          <ProtectedRoute><WishlistPage /></ProtectedRoute>
+        } />
+      </Routes>
+      
+      {/* Global ChatBot */}
+      <ChatBot />
+    </>
   );
-};
+}
 
 function App() {
   return (
-    <div className="App">
+    <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
+        <AuthProvider>
+          <AppRouter />
+          <Toaster 
+            position="top-right" 
+            toastOptions={{
+              style: {
+                background: '#18181b',
+                border: '1px solid #27272a',
+                color: '#f8fafc',
+              },
+            }}
+          />
+        </AuthProvider>
       </BrowserRouter>
-    </div>
+    </QueryClientProvider>
   );
 }
 

@@ -1,0 +1,231 @@
+{
+  "timestamp": "2026-03-09T16:46:47.991751",
+  "total_tests": 37,
+  "passed_tests": 37,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "test_results": [
+    {
+      "test": "Seed Data",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:29.413006"
+    },
+    {
+      "test": "Admin Login",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:30.177387"
+    },
+    {
+      "test": "Admin Token Retrieved",
+      "status": "PASS",
+      "details": "Token: eyJhbGciOiJIUzI1NiIs...",
+      "timestamp": "2026-03-09T16:46:30.177977"
+    },
+    {
+      "test": "Customer Signup",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:30.831900"
+    },
+    {
+      "test": "Customer Token Retrieved",
+      "status": "PASS",
+      "details": "Token: eyJhbGciOiJIUzI1NiIs...",
+      "timestamp": "2026-03-09T16:46:30.832513"
+    },
+    {
+      "test": "Auth Me - Admin",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:31.260392"
+    },
+    {
+      "test": "Admin Role Verification",
+      "status": "PASS",
+      "details": "Role: admin",
+      "timestamp": "2026-03-09T16:46:31.261000"
+    },
+    {
+      "test": "Auth Me - Customer",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:31.666813"
+    },
+    {
+      "test": "Customer Role Verification",
+      "status": "PASS",
+      "details": "Role: customer",
+      "timestamp": "2026-03-09T16:46:31.667438"
+    },
+    {
+      "test": "Dashboard Stats",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:32.084578"
+    },
+    {
+      "test": "Sales Trend",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:32.524894"
+    },
+    {
+      "test": "Top Products",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:32.930612"
+    },
+    {
+      "test": "Low Stock Products",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:33.340265"
+    },
+    {
+      "test": "Get Products",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:33.742464"
+    },
+    {
+      "test": "Get Categories",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:34.150745"
+    },
+    {
+      "test": "Create Product",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:34.581746"
+    },
+    {
+      "test": "Get Single Product",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:35.004585"
+    },
+    {
+      "test": "Update Product",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:35.435395"
+    },
+    {
+      "test": "Delete Product",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:35.858979"
+    },
+    {
+      "test": "Get Suppliers",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:36.273943"
+    },
+    {
+      "test": "Create Supplier",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:36.696582"
+    },
+    {
+      "test": "Update Supplier",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:37.121458"
+    },
+    {
+      "test": "Delete Supplier",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:37.526962"
+    },
+    {
+      "test": "Get Products for Cart",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:37.929433"
+    },
+    {
+      "test": "Add to Cart",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:38.406992"
+    },
+    {
+      "test": "Get Cart",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:38.814913"
+    },
+    {
+      "test": "Clear Cart",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:39.226872"
+    },
+    {
+      "test": "Get Products for Order",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:39.666985"
+    },
+    {
+      "test": "Create Order",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:40.084018"
+    },
+    {
+      "test": "Get Orders",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:40.500921"
+    },
+    {
+      "test": "Get Single Order",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:40.916832"
+    },
+    {
+      "test": "Get Products for Wishlist",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:41.329318"
+    },
+    {
+      "test": "Add to Wishlist",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:41.745690"
+    },
+    {
+      "test": "Get Wishlist",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:42.143563"
+    },
+    {
+      "test": "Remove from Wishlist",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:42.552428"
+    },
+    {
+      "test": "AI Chat Message",
+      "status": "PASS",
+      "details": "Status: 200",
+      "timestamp": "2026-03-09T16:46:47.990971"
+    },
+    {
+      "test": "AI Chat Response Quality",
+      "status": "PASS",
+      "details": "Response length: 734 chars",
+      "timestamp": "2026-03-09T16:46:47.991698"
+    }
+  ]
+}
