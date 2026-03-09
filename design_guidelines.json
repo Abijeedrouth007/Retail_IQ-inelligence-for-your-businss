@@ -1,0 +1,151 @@
+{
+  "branding": {
+    "name": "RetailIQ",
+    "tagline": "The Brain Behind Your Storefront",
+    "tone": "Visionary, Precision-Engineered, Dark-Mode Native",
+    "persona": "The 'Night Market' Architect - sophisticated, data-driven, yet visually electric.",
+    "emotional_archetype": "ARCHETYPE 7: ELECTRIC & NEON (Tailored for Business Intelligence)",
+    "visual_mood": "Cinematic Data. Think 'Minority Report' meets 'High-End Streetwear Store'."
+  },
+  "typography": {
+    "headings": {
+      "family": "Outfit, sans-serif",
+      "weights": ["Light (300)", "Medium (500)", "Bold (700)"],
+      "usage": "Use for all H1-H6. Tracking tight (-0.02em).",
+      "fallback": "Manrope"
+    },
+    "body": {
+      "family": "Inter, sans-serif",
+      "weights": ["Regular (400)", "Medium (500)"],
+      "usage": "Standard text. Relaxed line-height (1.6).",
+      "fallback": "system-ui"
+    },
+    "mono": {
+      "family": "JetBrains Mono, monospace",
+      "usage": "KPI values, order IDs, code snippets, inventory counts."
+    }
+  },
+  "colors": {
+    "theme": "dark",
+    "palette": {
+      "background": {
+        "default": "#09090b",
+        "paper": "#18181b",
+        "subtle": "#27272a"
+      },
+      "primary": {
+        "main": "#7c3aed",
+        "hover": "#6d28d9",
+        "foreground": "#ffffff"
+      },
+      "secondary": {
+        "main": "#2dd4bf",
+        "hover": "#14b8a6",
+        "foreground": "#000000"
+      },
+      "accent": {
+        "neon_pink": "#f472b6",
+        "electric_blue": "#3b82f6",
+        "warning": "#fbbf24"
+      },
+      "text": {
+        "primary": "#f8fafc",
+        "secondary": "#a1a1aa",
+        "muted": "#52525b"
+      },
+      "border": {
+        "default": "#27272a",
+        "active": "#3f3f46"
+      }
+    },
+    "gradients": {
+      "hero_glow": "radial-gradient(circle at center, rgba(124, 58, 237, 0.15) 0%, rgba(9, 9, 11, 0) 70%)",
+      "card_surface": "linear-gradient(180deg, rgba(39, 39, 42, 0.4) 0%, rgba(24, 24, 27, 0.4) 100%)"
+    }
+  },
+  "layout_strategy": {
+    "spacing": {
+      "scale": "2x",
+      "philosophy": "Generous breathing room. If you think it's enough, double it."
+    },
+    "grid_system": {
+      "dashboard": "Bento Grid (Dense). Grid cols 4. Use col-span-2 for major charts.",
+      "marketing": "Tetris Grid (Asymmetric). Grid cols 12. Mix wide and tall blocks.",
+      "gap": "gap-6 md:gap-8"
+    },
+    "container": {
+      "max_width": "max-w-7xl",
+      "padding": "px-6 md:px-12"
+    }
+  },
+  "components": {
+    "cards": {
+      "style": "Glass-morphism Lite. bg-zinc-900/50 backdrop-blur-md border border-white/5",
+      "radius": "rounded-2xl",
+      "shadow": "shadow-xl shadow-black/20"
+    },
+    "buttons": {
+      "primary": "rounded-full px-8 py-3 font-medium bg-primary text-primary-foreground hover:scale-105 transition-transform",
+      "secondary": "rounded-full px-8 py-3 font-medium border border-zinc-700 hover:bg-zinc-800 transition-colors"
+    },
+    "inputs": {
+      "style": "bg-zinc-950/50 border-zinc-800 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 rounded-xl h-12"
+    },
+    "charts": {
+      "library": "Recharts",
+      "style": "Minimal axes, gradient fills, custom tooltips (dark glass)."
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-filter: blur(12px); background: rgba(24, 24, 27, 0.6);",
+    "gradients": "Use subtle radial gradients behind hero images or key stats.",
+    "motion": "Framer Motion. Staggered entrance for lists. Spring transitions for hover.",
+    "borders": "1px solid rgba(255,255,255,0.08)"
+  },
+  "assets": {
+    "hero_image": "https://images.unsplash.com/photo-1700313238493-954af98df086?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "user_avatar": "https://images.unsplash.com/photo-1634552516330-ab1ccc0f605e?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "product_placeholder": "https://images.unsplash.com/photo-1768647417374-5a31c61dc5d0?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "map_placeholder": "Use a dark mode map style (Google Maps Dark Mode JSON) or a stylized static image for mockups."
+  },
+  "page_specifics": {
+    "landing_page": {
+      "sections": ["Hero (Cinematic Title + Scroll)", "Features (Bento Grid)", "AI Demo (Interactive Terminal)", "Pricing", "Footer"],
+      "vibe": "High energy, dark futuristic, scroll-triggered animations."
+    },
+    "dashboard": {
+      "layout": "Sidebar (Collapsible) + Topbar + Main Content Area",
+      "widgets": ["KPI Cards (Row 1)", "Revenue Chart (Row 2, Large)", "Recent Orders (Row 2, Small)", "Stock Alerts (Row 3)"],
+      "vibe": "Command Center. High data density but clear hierarchy."
+    },
+    "customer_store": {
+      "layout": "Grid of Product Cards. Large Hero Banner. Slide-out Cart.",
+      "vibe": "Immersive Shopping. Focus on product imagery."
+    }
+  },
+  "tech_instructions": {
+    "framework": "React (Create React App or Vite - JS based on file analysis)",
+    "styling": "Tailwind CSS + Shadcn/UI (adapted for JS)",
+    "icons": "Lucide React",
+    "charts": "Recharts",
+    "animation": "Framer Motion"
+  },
+  "universal_guidelines": [
+    "Do not get biased or lean towards generic examples.",
+    "Fusion over Imitation: Mix 3+ design references.",
+    "Emotion First: Every design decision maps to a feeling.",
+    "Content is king: Tell a story.",
+    "Zoom in: Use close-ups and bold focus.",
+    "Negative Space: Value the empty areas.",
+    "Contrast: Use light vs. dark, rough vs. smooth.",
+    "Avoid: Purple/Teal for CTA (Use Violet/Indigo instead).",
+    "Avoid: Inter everywhere (Use Outfit for headings).",
+    "Avoid: Center-Everything (Use asymmetry).",
+    "Avoid: Gradient Overload (Max 20%).",
+    "Generous Spacing: 2-3x more than typical.",
+    "Mobile-First: Always start with grid-cols-1.",
+    "Interactive Elements: Must have hover/focus states.",
+    "Accessibility: Meet APCA standards.",
+    "Data-TestID: All interactive elements must have data-testid."
+  ]
+}
