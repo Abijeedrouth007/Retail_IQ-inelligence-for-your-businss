@@ -12,10 +12,12 @@ import {
   Package,
   Loader2
 } from 'lucide-react';
+import { formatCurrency, useConfig } from '../../contexts/ConfigContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const WishlistPage = () => {
+  const { currencySymbol } = useConfig();
   const [wishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -139,7 +141,7 @@ const WishlistPage = () => {
                     <h3 className="font-semibold mb-2 line-clamp-1">{item.product_name}</h3>
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xl font-bold font-['JetBrains_Mono'] text-violet-400">
-                        ${item.price.toFixed(2)}
+                        {formatCurrency(item.price, currencySymbol)}
                       </span>
                       <span className={`text-sm ${
                         item.stock_quantity <= 0 ? 'text-red-400' : 'text-teal-400'

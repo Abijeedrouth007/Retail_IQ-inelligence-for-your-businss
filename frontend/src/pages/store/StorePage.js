@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -18,18 +19,23 @@ import {
   ShoppingCart,
   Heart,
   Package,
-  Loader2
+  Loader2,
+  Zap
 } from 'lucide-react';
+import { formatCurrency, useConfig } from '../../contexts/ConfigContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const StorePage = () => {
+  const navigate = useNavigate();
+  const { currencySymbol } = useConfig();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [wishlist, setWishlist] = useState(new Set());
+  const [buyingNow, setBuyingNow] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -83,6 +89,43 @@ const StorePage = () => {
       }
     } catch (error) {
       toast.error('Failed to add to cart');
+    }
+  };
+
+  const buyNow = async (productId) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Please login to purchase');
+      return;
+    }
+
+    setBuyingNow(productId);
+    try {
+      const res = await fetch(`${API_URL}/api/checkout/buy-now`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          product_id: productId,
+          quantity: 1,
+          origin_url: window.location.origin
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Redirect to Stripe checkout
+        window.location.href = data.checkout_url;
+      } else {
+        const error = await res.json();
+        toast.error(error.detail || 'Failed to initiate checkout');
+      }
+    } catch (error) {
+      toast.error('Failed to initiate checkout');
+    } finally {
+      setBuyingNow(null);
     }
   };
 
@@ -232,9 +275,9 @@ const StorePage = () => {
                     </div>
                     <h3 className="font-semibold mb-1 line-clamp-1">{product.name}</h3>
                     <p className="text-sm text-zinc-400 mb-3 line-clamp-2">{product.description}</p>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-4">
                       <span className="text-xl font-bold font-['JetBrains_Mono'] text-violet-400">
-                        ${product.price.toFixed(2)}
+                        {formatCurrency(product.price, currencySymbol)}
                       </span>
                       <span className={`text-sm ${
                         product.stock_quantity <= 0 ? 'text-red-400' :
@@ -246,15 +289,33 @@ const StorePage = () => {
                          'In stock'}
                       </span>
                     </div>
-                    <Button
-                      className="w-full mt-4 btn-primary"
-                      disabled={product.stock_quantity <= 0}
-                      onClick={() => addToCart(product.product_id)}
-                      data-testid={`add-to-cart-${product.product_id}`}
-                    >
-                      <ShoppingCart className="w-4 h-4 mr-2" />
-                      Add to Cart
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1"
+                        variant="outline"
+                        disabled={product.stock_quantity <= 0}
+                        onClick={() => addToCart(product.product_id)}
+                        data-testid={`add-to-cart-${product.product_id}`}
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Cart
+                      </Button>
+                      <Button
+                        className="flex-1 btn-primary"
+                        disabled={product.stock_quantity <= 0 || buyingNow === product.product_id}
+                        onClick={() => buyNow(product.product_id)}
+                        data-testid={`buy-now-${product.product_id}`}
+                      >
+                        {buyingNow === product.product_id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4 mr-2" />
+                            Buy Now
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>

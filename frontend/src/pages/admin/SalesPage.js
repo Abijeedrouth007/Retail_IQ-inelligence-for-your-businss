@@ -5,6 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select';
+import {
   AreaChart,
   Area,
   XAxis,
@@ -21,24 +28,38 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
+import { toast } from 'sonner';
 import {
   DollarSign,
   TrendingUp,
   ShoppingCart,
   Download,
-  Loader2
+  Loader2,
+  Truck,
+  CheckCircle,
+  Clock,
+  XCircle
 } from 'lucide-react';
+import { formatCurrency, useConfig } from '../../contexts/ConfigContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
-const CustomTooltip = ({ active, payload, label }) => {
+const statusConfig = {
+  pending: { icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/20', label: 'Pending' },
+  confirmed: { icon: CheckCircle, color: 'text-blue-400', bg: 'bg-blue-500/20', label: 'Confirmed' },
+  shipped: { icon: Truck, color: 'text-violet-400', bg: 'bg-violet-500/20', label: 'Shipped' },
+  delivered: { icon: CheckCircle, color: 'text-teal-400', bg: 'bg-teal-500/20', label: 'Delivered' },
+  cancelled: { icon: XCircle, color: 'text-red-400', bg: 'bg-red-500/20', label: 'Cancelled' }
+};
+
+const CustomTooltip = ({ active, payload, label, currencySymbol }) => {
   if (active && payload && payload.length) {
     return (
       <div className="custom-tooltip">
         <p className="text-sm font-medium">{label}</p>
         {payload.map((entry, index) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
-            Revenue: ${entry.value.toLocaleString()}
+            Revenue: {formatCurrency(entry.value, currencySymbol)}
           </p>
         ))}
       </div>
@@ -48,46 +69,72 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const SalesPage = () => {
+  const { currencySymbol } = useConfig();
   const [stats, setStats] = useState(null);
   const [salesTrend, setSalesTrend] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchData = async () => {
+    const token = localStorage.getItem('token');
+    const headers = { 'Authorization': `Bearer ${token}` };
+
+    try {
+      const [statsRes, trendRes, ordersRes] = await Promise.all([
+        fetch(`${API_URL}/api/analytics/dashboard`, { headers }),
+        fetch(`${API_URL}/api/analytics/sales-trend?days=7`, { headers }),
+        fetch(`${API_URL}/api/orders`, { headers })
+      ]);
+
+      if (statsRes.ok) setStats(await statsRes.json());
+      if (trendRes.ok) setSalesTrend(await trendRes.json());
+      if (ordersRes.ok) setOrders(await ordersRes.json());
+    } catch (error) {
+      console.error('Failed to fetch sales data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      const token = localStorage.getItem('token');
-      const headers = { 'Authorization': `Bearer ${token}` };
-
-      try {
-        const [statsRes, trendRes, ordersRes] = await Promise.all([
-          fetch(`${API_URL}/api/analytics/dashboard`, { headers }),
-          fetch(`${API_URL}/api/analytics/sales-trend?days=7`, { headers }),
-          fetch(`${API_URL}/api/orders`, { headers })
-        ]);
-
-        if (statsRes.ok) setStats(await statsRes.json());
-        if (trendRes.ok) setSalesTrend(await trendRes.json());
-        if (ordersRes.ok) setOrders(await ordersRes.json());
-      } catch (error) {
-        console.error('Failed to fetch sales data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
   }, []);
+
+  const updateOrderStatus = async (orderId, newStatus) => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (res.ok) {
+        toast.success(`Order status updated to ${newStatus}`);
+        // Refresh orders
+        fetchData();
+      } else {
+        toast.error('Failed to update order status');
+      }
+    } catch (error) {
+      toast.error('Failed to update order status');
+    }
+  };
 
   const todayRevenue = salesTrend.length > 0 ? salesTrend[salesTrend.length - 1]?.revenue : 0;
 
   const exportCSV = () => {
-    const headers = ['Order ID', 'Customer', 'Items', 'Total', 'Status', 'Date'];
+    const headers = ['Order ID', 'Customer', 'Items', 'Total', 'Status', 'Payment', 'Date'];
     const rows = orders.map(o => [
       o.order_id,
       o.customer_name || 'N/A',
       o.items.length,
       o.total_amount.toFixed(2),
       o.status,
+      o.payment_status || 'N/A',
       new Date(o.created_at).toLocaleDateString()
     ]);
 
@@ -100,6 +147,8 @@ const SalesPage = () => {
     a.click();
   };
 
+  const getStatusConfig = (status) => statusConfig[status] || statusConfig.pending;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -107,7 +156,7 @@ const SalesPage = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold font-['Outfit']">Sales</h1>
-            <p className="text-zinc-400 mt-1">Track your revenue and orders</p>
+            <p className="text-zinc-400 mt-1">Track your revenue and manage orders</p>
           </div>
           <Button onClick={exportCSV} variant="outline" className="border-zinc-700" data-testid="export-csv-btn">
             <Download className="w-4 h-4 mr-2" />
@@ -127,7 +176,7 @@ const SalesPage = () => {
                   <div>
                     <p className="text-zinc-400 text-sm">Total Revenue</p>
                     <p className="text-2xl font-bold font-['JetBrains_Mono']">
-                      ${stats?.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}
+                      {formatCurrency(stats?.total_revenue || 0, currencySymbol)}
                     </p>
                   </div>
                 </div>
@@ -145,7 +194,7 @@ const SalesPage = () => {
                   <div>
                     <p className="text-zinc-400 text-sm">Today's Revenue</p>
                     <p className="text-2xl font-bold font-['JetBrains_Mono']">
-                      ${todayRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {formatCurrency(todayRevenue, currencySymbol)}
                     </p>
                   </div>
                 </div>
@@ -196,9 +245,9 @@ const SalesPage = () => {
                     <YAxis 
                       stroke="#52525b"
                       tick={{ fill: '#71717a', fontSize: 12 }}
-                      tickFormatter={(value) => `$${value}`}
+                      tickFormatter={(value) => `${currencySymbol}${value}`}
                     />
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<CustomTooltip currencySymbol={currencySymbol} />} />
                     <Area
                       type="monotone"
                       dataKey="revenue"
@@ -214,11 +263,11 @@ const SalesPage = () => {
           </Card>
         </motion.div>
 
-        {/* Recent Orders */}
+        {/* Orders with Status Management */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
           <Card className="bg-zinc-900/50 border-zinc-800">
             <CardHeader>
-              <CardTitle>Recent Orders</CardTitle>
+              <CardTitle>Orders Management</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
@@ -239,29 +288,52 @@ const SalesPage = () => {
                         <TableHead className="text-zinc-400">Customer</TableHead>
                         <TableHead className="text-zinc-400">Items</TableHead>
                         <TableHead className="text-zinc-400">Total</TableHead>
+                        <TableHead className="text-zinc-400">Payment</TableHead>
                         <TableHead className="text-zinc-400">Status</TableHead>
                         <TableHead className="text-zinc-400">Date</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {orders.slice(0, 10).map((order) => (
-                        <TableRow key={order.order_id} className="border-zinc-800">
-                          <TableCell className="font-['JetBrains_Mono'] text-sm">
-                            {order.order_id.slice(0, 12)}...
-                          </TableCell>
-                          <TableCell>{order.customer_name || 'N/A'}</TableCell>
-                          <TableCell>{order.items.length} items</TableCell>
-                          <TableCell className="font-['JetBrains_Mono'] text-teal-400">
-                            ${order.total_amount.toFixed(2)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className="badge-success capitalize">{order.status}</Badge>
-                          </TableCell>
-                          <TableCell className="text-zinc-400">
-                            {new Date(order.created_at).toLocaleDateString()}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {orders.slice(0, 15).map((order) => {
+                        const statusCfg = getStatusConfig(order.status);
+                        return (
+                          <TableRow key={order.order_id} className="border-zinc-800">
+                            <TableCell className="font-['JetBrains_Mono'] text-sm">
+                              {order.order_id.slice(0, 12)}...
+                            </TableCell>
+                            <TableCell>{order.customer_name || 'N/A'}</TableCell>
+                            <TableCell>{order.items.length} items</TableCell>
+                            <TableCell className="font-['JetBrains_Mono'] text-teal-400">
+                              {formatCurrency(order.total_amount, currencySymbol)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={order.payment_status === 'paid' ? 'badge-success' : 'badge-warning'}>
+                                {order.payment_status === 'paid' ? 'Paid' : order.payment_status === 'cod' ? 'COD' : 'Pending'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={order.status}
+                                onValueChange={(value) => updateOrderStatus(order.order_id, value)}
+                              >
+                                <SelectTrigger className={`w-[130px] h-8 ${statusCfg.bg} ${statusCfg.color} border-none`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-zinc-900 border-zinc-800">
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                                  <SelectItem value="shipped">Shipped</SelectItem>
+                                  <SelectItem value="delivered">Delivered</SelectItem>
+                                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell className="text-zinc-400">
+                              {new Date(order.created_at).toLocaleDateString()}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

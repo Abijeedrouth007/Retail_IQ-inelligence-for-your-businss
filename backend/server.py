@@ -7,7 +7,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uuid
 from datetime import datetime, timezone, timedelta
 import bcrypt
@@ -26,6 +26,10 @@ db = client[os.environ['DB_NAME']]
 JWT_SECRET = os.environ.get('JWT_SECRET', 'retailiq_secret')
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_DAYS = 7
+
+# Currency Config - Indian Rupees
+CURRENCY = "INR"
+CURRENCY_SYMBOL = "₹"
 
 # Create the main app
 app = FastAPI(title="RetailIQ API")
@@ -124,10 +128,16 @@ class OrderResponse(BaseModel):
     order_id: str
     customer_id: str
     customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
     items: List[OrderItemResponse]
     total_amount: float
     status: str
+    payment_status: str = "pending"
+    payment_session_id: Optional[str] = None
     created_at: datetime
+
+class OrderStatusUpdate(BaseModel):
+    status: str  # pending, confirmed, shipped, delivered, cancelled
 
 class SupplierBase(BaseModel):
     name: str
@@ -193,6 +203,110 @@ class CustomerStats(BaseModel):
     phone: Optional[str]
     order_count: int
     total_spent: float
+
+class CheckoutRequest(BaseModel):
+    order_id: Optional[str] = None
+    items: Optional[List[OrderItemCreate]] = None
+    origin_url: str
+
+class CheckoutResponse(BaseModel):
+    checkout_url: str
+    session_id: str
+    order_id: str
+
+class BuyNowRequest(BaseModel):
+    product_id: str
+    quantity: int = 1
+    origin_url: str
+
+# ===================== EMAIL SERVICE =====================
+
+async def send_order_email(to_email: str, order: dict, email_type: str = "confirmation"):
+    """Send order-related emails via SendGrid"""
+    sendgrid_key = os.environ.get("SENDGRID_API_KEY")
+    from_email = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@retailiq.com")
+    
+    if not sendgrid_key or sendgrid_key == "YOUR_SENDGRID_API_KEY":
+        logger.warning("SendGrid not configured - email not sent")
+        return False
+    
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail
+        
+        # Generate email content based on type
+        if email_type == "confirmation":
+            subject = f"Order Confirmed - #{order['order_id'][:12]}"
+            html_content = f"""
+            <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #7c3aed; padding: 20px; text-align: center;">
+                    <h1 style="color: white; margin: 0;">RetailIQ</h1>
+                </div>
+                <div style="padding: 30px; background: #f9f9f9;">
+                    <h2>Order Confirmed!</h2>
+                    <p>Thank you for your order. Here are your order details:</p>
+                    <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <p><strong>Order ID:</strong> {order['order_id']}</p>
+                        <p><strong>Total Amount:</strong> {CURRENCY_SYMBOL}{order['total_amount']:,.2f}</p>
+                        <p><strong>Status:</strong> {order['status'].title()}</p>
+                    </div>
+                    <h3>Items Ordered:</h3>
+                    <ul>
+                        {"".join([f"<li>{item['product_name']} x{item['quantity']} - {CURRENCY_SYMBOL}{item['total']:,.2f}</li>" for item in order['items']])}
+                    </ul>
+                </div>
+                <div style="background: #1a1a1a; color: #888; padding: 20px; text-align: center;">
+                    <p>© 2024 RetailIQ. All rights reserved.</p>
+                </div>
+            </body>
+            </html>
+            """
+        elif email_type == "status_update":
+            status_messages = {
+                "confirmed": "Your order has been confirmed and is being processed.",
+                "shipped": "Great news! Your order has been shipped and is on its way.",
+                "delivered": "Your order has been delivered. Thank you for shopping with us!",
+                "cancelled": "Your order has been cancelled."
+            }
+            subject = f"Order Update - #{order['order_id'][:12]} - {order['status'].title()}"
+            html_content = f"""
+            <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #7c3aed; padding: 20px; text-align: center;">
+                    <h1 style="color: white; margin: 0;">RetailIQ</h1>
+                </div>
+                <div style="padding: 30px; background: #f9f9f9;">
+                    <h2>Order Status Update</h2>
+                    <p>{status_messages.get(order['status'], 'Your order status has been updated.')}</p>
+                    <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <p><strong>Order ID:</strong> {order['order_id']}</p>
+                        <p><strong>New Status:</strong> <span style="color: #7c3aed; font-weight: bold;">{order['status'].title()}</span></p>
+                        <p><strong>Total Amount:</strong> {CURRENCY_SYMBOL}{order['total_amount']:,.2f}</p>
+                    </div>
+                </div>
+                <div style="background: #1a1a1a; color: #888; padding: 20px; text-align: center;">
+                    <p>© 2024 RetailIQ. All rights reserved.</p>
+                </div>
+            </body>
+            </html>
+            """
+        else:
+            return False
+        
+        message = Mail(
+            from_email=from_email,
+            to_emails=to_email,
+            subject=subject,
+            html_content=html_content
+        )
+        
+        sg = SendGridAPIClient(sendgrid_key)
+        response = sg.send(message)
+        return response.status_code == 202
+    except Exception as e:
+        logger.error(f"Failed to send email: {e}")
+        return False
 
 # ===================== AUTH HELPERS =====================
 
@@ -488,13 +602,13 @@ async def get_categories():
 
 # ===================== ORDERS ROUTES =====================
 
-@api_router.post("/orders", response_model=OrderResponse)
-async def create_order(data: OrderCreate, user: UserResponse = Depends(get_current_user)):
+async def create_order_internal(user: UserResponse, items: List[OrderItemCreate], payment_status: str = "pending") -> dict:
+    """Internal function to create an order"""
     order_id = f"ord_{uuid.uuid4().hex[:12]}"
-    items = []
+    order_items = []
     total_amount = 0
     
-    for item in data.items:
+    for item in items:
         product = await db.products.find_one({"product_id": item.product_id}, {"_id": 0})
         if not product:
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
@@ -503,30 +617,54 @@ async def create_order(data: OrderCreate, user: UserResponse = Depends(get_curre
         
         item_total = product["price"] * item.quantity
         total_amount += item_total
-        items.append({
+        order_items.append({
             "product_id": item.product_id,
             "product_name": product["name"],
             "quantity": item.quantity,
             "unit_price": product["price"],
             "total": item_total
         })
-        
-        # Update stock
-        await db.products.update_one(
-            {"product_id": item.product_id},
-            {"$inc": {"stock_quantity": -item.quantity}}
-        )
     
     order_doc = {
         "order_id": order_id,
         "customer_id": user.user_id,
         "customer_name": user.name,
-        "items": items,
+        "customer_email": user.email,
+        "items": order_items,
         "total_amount": total_amount,
-        "status": "completed",
+        "status": "pending",
+        "payment_status": payment_status,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.orders.insert_one(order_doc)
+    return order_doc
+
+@api_router.post("/orders", response_model=OrderResponse)
+async def create_order(data: OrderCreate, user: UserResponse = Depends(get_current_user)):
+    """Create order with pending payment (for cart checkout without Stripe)"""
+    order_doc = await create_order_internal(user, data.items, "pending")
+    
+    # Deduct stock
+    for item in data.items:
+        await db.products.update_one(
+            {"product_id": item.product_id},
+            {"$inc": {"stock_quantity": -item.quantity}}
+        )
+    
+    # Update status to confirmed for non-payment orders
+    await db.orders.update_one(
+        {"order_id": order_doc["order_id"]},
+        {"$set": {"status": "confirmed", "payment_status": "cod"}}  # Cash on delivery
+    )
+    order_doc["status"] = "confirmed"
+    order_doc["payment_status"] = "cod"
+    
+    # Send confirmation email
+    await send_order_email(user.email, order_doc, "confirmation")
+    
+    # Clear cart
+    await db.cart_items.delete_many({"user_id": user.user_id})
+    
     order_doc["created_at"] = datetime.fromisoformat(order_doc["created_at"])
     return OrderResponse(**order_doc)
 
@@ -554,6 +692,223 @@ async def get_order(order_id: str, user: UserResponse = Depends(get_current_user
     if isinstance(order.get("created_at"), str):
         order["created_at"] = datetime.fromisoformat(order["created_at"])
     return OrderResponse(**order)
+
+@api_router.put("/orders/{order_id}/status")
+async def update_order_status(order_id: str, data: OrderStatusUpdate, user: UserResponse = Depends(require_admin)):
+    """Update order status (Admin only)"""
+    valid_statuses = ["pending", "confirmed", "shipped", "delivered", "cancelled"]
+    if data.status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+    
+    order = await db.orders.find_one({"order_id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    await db.orders.update_one(
+        {"order_id": order_id},
+        {"$set": {"status": data.status}}
+    )
+    
+    # Send status update email
+    order["status"] = data.status
+    if order.get("customer_email"):
+        await send_order_email(order["customer_email"], order, "status_update")
+    
+    return {"message": f"Order status updated to {data.status}"}
+
+# ===================== PAYMENT ROUTES (STRIPE) =====================
+
+@api_router.post("/checkout/session", response_model=CheckoutResponse)
+async def create_checkout_session(data: CheckoutRequest, request: Request, user: UserResponse = Depends(get_current_user)):
+    """Create Stripe checkout session for cart or specific order"""
+    from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
+    
+    stripe_key = os.environ.get("STRIPE_API_KEY")
+    if not stripe_key:
+        raise HTTPException(status_code=500, detail="Payment service not configured")
+    
+    # Get items from cart or order
+    if data.order_id:
+        order = await db.orders.find_one({"order_id": data.order_id}, {"_id": 0})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        items = [OrderItemCreate(product_id=i["product_id"], quantity=i["quantity"]) for i in order["items"]]
+        total_amount = order["total_amount"]
+        order_id = data.order_id
+    elif data.items:
+        # Create new order
+        order_doc = await create_order_internal(user, data.items, "pending")
+        items = data.items
+        total_amount = order_doc["total_amount"]
+        order_id = order_doc["order_id"]
+    else:
+        # Get cart items
+        cart_items = await db.cart_items.find({"user_id": user.user_id}, {"_id": 0}).to_list(100)
+        if not cart_items:
+            raise HTTPException(status_code=400, detail="Cart is empty")
+        
+        items = [OrderItemCreate(product_id=c["product_id"], quantity=c["quantity"]) for c in cart_items]
+        order_doc = await create_order_internal(user, items, "pending")
+        total_amount = order_doc["total_amount"]
+        order_id = order_doc["order_id"]
+    
+    # Build URLs
+    success_url = f"{data.origin_url}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{data.origin_url}/checkout/cancel?order_id={order_id}"
+    
+    # Create Stripe checkout
+    host_url = str(request.base_url)
+    webhook_url = f"{host_url}api/webhook/stripe"
+    
+    stripe_checkout = StripeCheckout(api_key=stripe_key, webhook_url=webhook_url)
+    
+    checkout_request = CheckoutSessionRequest(
+        amount=float(total_amount),
+        currency=CURRENCY.lower(),
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
+            "order_id": order_id,
+            "user_id": user.user_id,
+            "user_email": user.email
+        }
+    )
+    
+    session = await stripe_checkout.create_checkout_session(checkout_request)
+    
+    # Store payment transaction
+    await db.payment_transactions.insert_one({
+        "transaction_id": f"txn_{uuid.uuid4().hex[:12]}",
+        "session_id": session.session_id,
+        "order_id": order_id,
+        "user_id": user.user_id,
+        "user_email": user.email,
+        "amount": total_amount,
+        "currency": CURRENCY,
+        "payment_status": "initiated",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Update order with session ID
+    await db.orders.update_one(
+        {"order_id": order_id},
+        {"$set": {"payment_session_id": session.session_id}}
+    )
+    
+    return CheckoutResponse(
+        checkout_url=session.url,
+        session_id=session.session_id,
+        order_id=order_id
+    )
+
+@api_router.post("/checkout/buy-now", response_model=CheckoutResponse)
+async def buy_now(data: BuyNowRequest, request: Request, user: UserResponse = Depends(get_current_user)):
+    """Quick buy - create order and checkout for single product"""
+    items = [OrderItemCreate(product_id=data.product_id, quantity=data.quantity)]
+    checkout_data = CheckoutRequest(items=items, origin_url=data.origin_url)
+    return await create_checkout_session(checkout_data, request, user)
+
+@api_router.get("/checkout/status/{session_id}")
+async def get_checkout_status(session_id: str, user: UserResponse = Depends(get_current_user)):
+    """Check payment status and update order"""
+    from emergentintegrations.payments.stripe.checkout import StripeCheckout
+    
+    stripe_key = os.environ.get("STRIPE_API_KEY")
+    if not stripe_key:
+        raise HTTPException(status_code=500, detail="Payment service not configured")
+    
+    stripe_checkout = StripeCheckout(api_key=stripe_key, webhook_url="")
+    status = await stripe_checkout.get_checkout_status(session_id)
+    
+    # Get transaction
+    transaction = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Update if payment successful and not already processed
+    if status.payment_status == "paid" and transaction["payment_status"] != "paid":
+        # Update transaction
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        # Update order
+        order_id = transaction["order_id"]
+        await db.orders.update_one(
+            {"order_id": order_id},
+            {"$set": {"status": "confirmed", "payment_status": "paid"}}
+        )
+        
+        # Deduct stock
+        order = await db.orders.find_one({"order_id": order_id}, {"_id": 0})
+        for item in order["items"]:
+            await db.products.update_one(
+                {"product_id": item["product_id"]},
+                {"$inc": {"stock_quantity": -item["quantity"]}}
+            )
+        
+        # Clear cart
+        await db.cart_items.delete_many({"user_id": user.user_id})
+        
+        # Send confirmation email
+        order["status"] = "confirmed"
+        order["payment_status"] = "paid"
+        if order.get("customer_email"):
+            await send_order_email(order["customer_email"], order, "confirmation")
+    
+    elif status.status == "expired":
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {"$set": {"payment_status": "expired"}}
+        )
+        await db.orders.update_one(
+            {"order_id": transaction["order_id"]},
+            {"$set": {"status": "cancelled", "payment_status": "expired"}}
+        )
+    
+    return {
+        "status": status.status,
+        "payment_status": status.payment_status,
+        "amount": status.amount_total / 100,  # Convert from paise to rupees
+        "currency": status.currency.upper(),
+        "order_id": transaction["order_id"]
+    }
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events"""
+    from emergentintegrations.payments.stripe.checkout import StripeCheckout
+    
+    stripe_key = os.environ.get("STRIPE_API_KEY")
+    if not stripe_key:
+        return {"status": "error", "message": "Payment service not configured"}
+    
+    body = await request.body()
+    signature = request.headers.get("Stripe-Signature")
+    
+    try:
+        stripe_checkout = StripeCheckout(api_key=stripe_key, webhook_url="")
+        event = await stripe_checkout.handle_webhook(body, signature)
+        
+        if event.payment_status == "paid":
+            session_id = event.session_id
+            # Process payment success
+            transaction = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+            if transaction and transaction["payment_status"] != "paid":
+                await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {"$set": {"payment_status": "paid"}}
+                )
+                await db.orders.update_one(
+                    {"order_id": transaction["order_id"]},
+                    {"$set": {"status": "confirmed", "payment_status": "paid"}}
+                )
+        
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return {"status": "error", "message": str(e)}
 
 # ===================== SUPPLIERS ROUTES =====================
 
@@ -817,7 +1172,7 @@ async def chat_with_ai(data: ChatMessage, user: UserResponse = Depends(get_curre
     # Get context data
     stats = await get_dashboard_stats(user) if user.role == "admin" else None
     
-    system_message = """You are RetailIQ Assistant, an AI helper for a retail management platform. 
+    system_message = f"""You are RetailIQ Assistant, an AI helper for a retail management platform in India. 
 You help shop owners with:
 - Inventory management and stock advice
 - Sales analysis and trends
@@ -825,13 +1180,15 @@ You help shop owners with:
 - Product recommendations
 - Business optimization tips
 
+Currency used: Indian Rupees ({CURRENCY_SYMBOL})
+
 Be concise, helpful, and data-driven in your responses."""
     
     if stats:
         system_message += f"""
 
 Current store stats:
-- Total Revenue: ${stats.total_revenue:,.2f}
+- Total Revenue: {CURRENCY_SYMBOL}{stats.total_revenue:,.2f}
 - Today's Orders: {stats.today_orders}
 - Total Products: {stats.total_products}
 - Low Stock Alerts: {stats.low_stock_count}"""
@@ -894,6 +1251,16 @@ async def update_profile(
     
     return {"message": "Profile updated"}
 
+# ===================== CONFIG ENDPOINT =====================
+
+@api_router.get("/config")
+async def get_config():
+    """Get app configuration (currency, etc.)"""
+    return {
+        "currency": CURRENCY,
+        "currency_symbol": CURRENCY_SYMBOL
+    }
+
 # ===================== SEED DATA =====================
 
 @api_router.post("/seed")
@@ -915,21 +1282,20 @@ async def seed_data():
     })
     await db.user_roles.insert_one({"user_id": admin_id, "role": "admin"})
     
-    # Sample products
-    categories = ["Electronics", "Clothing", "Groceries", "Home & Garden", "Sports"]
+    # Sample products with INR prices
     products = [
-        {"name": "Wireless Earbuds", "category": "Electronics", "price": 79.99, "cost_price": 45.00, "stock_quantity": 150, "reorder_level": 20, "image_url": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400"},
-        {"name": "Smart Watch", "category": "Electronics", "price": 299.99, "cost_price": 180.00, "stock_quantity": 45, "reorder_level": 10, "image_url": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400"},
-        {"name": "Bluetooth Speaker", "category": "Electronics", "price": 129.99, "cost_price": 75.00, "stock_quantity": 80, "reorder_level": 15, "image_url": "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400"},
-        {"name": "Cotton T-Shirt", "category": "Clothing", "price": 24.99, "cost_price": 8.00, "stock_quantity": 200, "reorder_level": 30, "image_url": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400"},
-        {"name": "Denim Jeans", "category": "Clothing", "price": 59.99, "cost_price": 25.00, "stock_quantity": 120, "reorder_level": 20, "image_url": "https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?w=400"},
-        {"name": "Running Shoes", "category": "Sports", "price": 149.99, "cost_price": 85.00, "stock_quantity": 60, "reorder_level": 15, "image_url": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400"},
-        {"name": "Organic Coffee Beans", "category": "Groceries", "price": 18.99, "cost_price": 9.00, "stock_quantity": 5, "reorder_level": 25, "image_url": "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400"},
-        {"name": "Extra Virgin Olive Oil", "category": "Groceries", "price": 14.99, "cost_price": 7.00, "stock_quantity": 90, "reorder_level": 20, "image_url": "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400"},
-        {"name": "Indoor Plant Pot", "category": "Home & Garden", "price": 34.99, "cost_price": 15.00, "stock_quantity": 8, "reorder_level": 15, "image_url": "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=400"},
-        {"name": "LED Desk Lamp", "category": "Home & Garden", "price": 49.99, "cost_price": 22.00, "stock_quantity": 55, "reorder_level": 10, "image_url": "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400"},
-        {"name": "Yoga Mat", "category": "Sports", "price": 39.99, "cost_price": 15.00, "stock_quantity": 70, "reorder_level": 15, "image_url": "https://images.unsplash.com/photo-1601925260368-ae2f83cf8b7f?w=400"},
-        {"name": "Fitness Tracker", "category": "Electronics", "price": 89.99, "cost_price": 45.00, "stock_quantity": 3, "reorder_level": 10, "image_url": "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=400"},
+        {"name": "Wireless Earbuds", "category": "Electronics", "price": 2999.00, "cost_price": 1800.00, "stock_quantity": 150, "reorder_level": 20, "image_url": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400"},
+        {"name": "Smart Watch", "category": "Electronics", "price": 12999.00, "cost_price": 8000.00, "stock_quantity": 45, "reorder_level": 10, "image_url": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400"},
+        {"name": "Bluetooth Speaker", "category": "Electronics", "price": 4999.00, "cost_price": 3000.00, "stock_quantity": 80, "reorder_level": 15, "image_url": "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400"},
+        {"name": "Cotton T-Shirt", "category": "Clothing", "price": 799.00, "cost_price": 350.00, "stock_quantity": 200, "reorder_level": 30, "image_url": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400"},
+        {"name": "Denim Jeans", "category": "Clothing", "price": 1999.00, "cost_price": 900.00, "stock_quantity": 120, "reorder_level": 20, "image_url": "https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?w=400"},
+        {"name": "Running Shoes", "category": "Sports", "price": 4499.00, "cost_price": 2500.00, "stock_quantity": 60, "reorder_level": 15, "image_url": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400"},
+        {"name": "Organic Coffee Beans", "category": "Groceries", "price": 599.00, "cost_price": 300.00, "stock_quantity": 5, "reorder_level": 25, "image_url": "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400"},
+        {"name": "Extra Virgin Olive Oil", "category": "Groceries", "price": 899.00, "cost_price": 450.00, "stock_quantity": 90, "reorder_level": 20, "image_url": "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400"},
+        {"name": "Indoor Plant Pot", "category": "Home & Garden", "price": 1299.00, "cost_price": 600.00, "stock_quantity": 8, "reorder_level": 15, "image_url": "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=400"},
+        {"name": "LED Desk Lamp", "category": "Home & Garden", "price": 1799.00, "cost_price": 800.00, "stock_quantity": 55, "reorder_level": 10, "image_url": "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400"},
+        {"name": "Yoga Mat", "category": "Sports", "price": 1299.00, "cost_price": 500.00, "stock_quantity": 70, "reorder_level": 15, "image_url": "https://images.unsplash.com/photo-1601925260368-ae2f83cf8b7f?w=400"},
+        {"name": "Fitness Tracker", "category": "Electronics", "price": 3499.00, "cost_price": 1800.00, "stock_quantity": 3, "reorder_level": 10, "image_url": "https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=400"},
     ]
     
     for p in products:
@@ -943,9 +1309,9 @@ async def seed_data():
     
     # Sample suppliers
     suppliers = [
-        {"name": "TechSupply Co.", "email": "orders@techsupply.com", "phone": "1234567890", "address": "123 Tech Street, Silicon Valley"},
-        {"name": "Fashion Forward", "email": "contact@fashionforward.com", "phone": "2345678901", "address": "456 Style Ave, New York"},
-        {"name": "Fresh Farms Inc.", "email": "supply@freshfarms.com", "phone": "3456789012", "address": "789 Farm Road, Kansas"},
+        {"name": "TechSupply India", "email": "orders@techsupply.in", "phone": "9876543210", "address": "123 Tech Park, Bangalore"},
+        {"name": "Fashion Forward", "email": "contact@fashionforward.in", "phone": "9876543211", "address": "456 Style Street, Mumbai"},
+        {"name": "Fresh Farms India", "email": "supply@freshfarms.in", "phone": "9876543212", "address": "789 Farm Road, Punjab"},
     ]
     
     for s in suppliers:
@@ -978,9 +1344,11 @@ async def seed_data():
             "order_id": f"ord_{uuid.uuid4().hex[:12]}",
             "customer_id": admin_id,
             "customer_name": "Demo Customer",
+            "customer_email": "admin@retailiq.com",
             "items": items,
             "total_amount": total,
-            "status": "completed",
+            "status": "delivered",
+            "payment_status": "paid",
             "created_at": order_date.isoformat()
         })
     

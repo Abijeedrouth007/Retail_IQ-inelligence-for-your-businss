@@ -25,17 +25,18 @@ import {
   Bot,
   Loader2
 } from 'lucide-react';
+import { formatCurrency, useConfig } from '../../contexts/ConfigContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label, currencySymbol }) => {
   if (active && payload && payload.length) {
     return (
       <div className="custom-tooltip">
         <p className="text-sm font-medium">{label}</p>
         {payload.map((entry, index) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
-            {entry.name}: {entry.name.includes('revenue') ? `$${entry.value.toLocaleString()}` : entry.value}
+            {entry.name}: {entry.name.includes('revenue') ? formatCurrency(entry.value, currencySymbol) : entry.value}
           </p>
         ))}
       </div>
@@ -45,6 +46,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const AnalyticsPage = () => {
+  const { currencySymbol } = useConfig();
   const [stats, setStats] = useState(null);
   const [salesTrend, setSalesTrend] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
@@ -132,10 +134,9 @@ const AnalyticsPage = () => {
                   <span className="text-zinc-400 text-sm">Avg. Order Value</span>
                 </div>
                 <p className="text-2xl font-bold font-['JetBrains_Mono']">
-                  ${salesTrend.length > 0 
-                    ? (salesTrend.reduce((acc, d) => acc + d.revenue, 0) / salesTrend.reduce((acc, d) => acc + d.orders, 0) || 0).toFixed(2)
-                    : '0.00'
-                  }
+                  {formatCurrency(salesTrend.length > 0 
+                    ? (salesTrend.reduce((acc, d) => acc + d.revenue, 0) / salesTrend.reduce((acc, d) => acc + d.orders, 0) || 0)
+                    : 0, currencySymbol)}
                 </p>
                 <p className="text-xs text-zinc-500 mt-1">per order</p>
               </CardContent>
@@ -198,9 +199,9 @@ const AnalyticsPage = () => {
                     <YAxis 
                       stroke="#52525b"
                       tick={{ fill: '#71717a', fontSize: 12 }}
-                      tickFormatter={(value) => `$${value}`}
+                      tickFormatter={(value) => `${currencySymbol}${value}`}
                     />
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<CustomTooltip currencySymbol={currencySymbol} />} />
                     <Area
                       type="monotone"
                       dataKey="revenue"
@@ -236,7 +237,7 @@ const AnalyticsPage = () => {
                         tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { weekday: 'short' })}
                       />
                       <YAxis stroke="#52525b" tick={{ fill: '#71717a', fontSize: 12 }} />
-                      <Tooltip content={<CustomTooltip />} />
+                      <Tooltip content={<CustomTooltip currencySymbol={currencySymbol} />} />
                       <Bar dataKey="orders" fill="#2dd4bf" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -269,7 +270,7 @@ const AnalyticsPage = () => {
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip content={<CustomTooltip currencySymbol={currencySymbol} />} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -284,7 +285,7 @@ const AnalyticsPage = () => {
                           <span className="text-sm text-zinc-400 truncate max-w-[120px]">{product.name}</span>
                         </div>
                         <span className="font-['JetBrains_Mono'] text-sm">
-                          ${product.revenue?.toLocaleString() || 0}
+                          {formatCurrency(product.revenue || 0, currencySymbol)}
                         </span>
                       </div>
                     ))}
@@ -322,7 +323,7 @@ const AnalyticsPage = () => {
                           </div>
                         </div>
                         <span className="font-['JetBrains_Mono'] text-teal-400">
-                          ${customer.total_spent.toFixed(2)}
+                          {formatCurrency(customer.total_spent, currencySymbol)}
                         </span>
                       </div>
                     ))}
@@ -346,7 +347,7 @@ const AnalyticsPage = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-zinc-400">Expected Revenue (Next Week)</span>
                         <span className="font-['JetBrains_Mono'] text-teal-400">
-                          ${((stats?.total_revenue || 0) * 1.15).toFixed(2)}
+                          {formatCurrency((stats?.total_revenue || 0) * 1.15, currencySymbol)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">

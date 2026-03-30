@@ -23,19 +23,19 @@ import {
   AlertTriangle,
   TrendingUp,
   TrendingDown,
-  ArrowUpRight
 } from 'lucide-react';
+import { formatCurrency, useConfig } from '../../contexts/ConfigContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label, currencySymbol }) => {
   if (active && payload && payload.length) {
     return (
       <div className="custom-tooltip">
         <p className="text-sm font-medium">{label}</p>
         {payload.map((entry, index) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
-            {entry.name}: {entry.name === 'revenue' ? `$${entry.value.toLocaleString()}` : entry.value}
+            {entry.name}: {entry.name === 'revenue' ? formatCurrency(entry.value, currencySymbol) : entry.value}
           </p>
         ))}
       </div>
@@ -75,6 +75,7 @@ const KPICard = ({ title, value, change, icon: Icon, trend, delay }) => (
 );
 
 const DashboardPage = () => {
+  const { currencySymbol } = useConfig();
   const [stats, setStats] = useState(null);
   const [salesTrend, setSalesTrend] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
@@ -123,7 +124,7 @@ const DashboardPage = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           <KPICard
             title="Total Revenue"
-            value={stats ? `$${stats.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '$0'}
+            value={stats ? formatCurrency(stats.total_revenue, currencySymbol) : `${currencySymbol}0`}
             change="+12.5% from last month"
             icon={DollarSign}
             trend="up"
@@ -187,9 +188,9 @@ const DashboardPage = () => {
                       <YAxis 
                         stroke="#52525b"
                         tick={{ fill: '#71717a', fontSize: 12 }}
-                        tickFormatter={(value) => `$${value}`}
+                        tickFormatter={(value) => `${currencySymbol}${value}`}
                       />
-                      <Tooltip content={<CustomTooltip />} />
+                      <Tooltip content={<CustomTooltip currencySymbol={currencySymbol} />} />
                       <Area
                         type="monotone"
                         dataKey="revenue"
@@ -233,7 +234,7 @@ const DashboardPage = () => {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip content={<CustomTooltip />} />
+                      <Tooltip content={<CustomTooltip currencySymbol={currencySymbol} />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -248,7 +249,7 @@ const DashboardPage = () => {
                         <span className="text-zinc-400 truncate max-w-[120px]">{product.name}</span>
                       </div>
                       <span className="font-['JetBrains_Mono'] text-zinc-300">
-                        ${product.revenue?.toLocaleString() || 0}
+                        {formatCurrency(product.revenue || 0, currencySymbol)}
                       </span>
                     </div>
                   ))}
@@ -282,7 +283,7 @@ const DashboardPage = () => {
                         tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { weekday: 'short' })}
                       />
                       <YAxis stroke="#52525b" tick={{ fill: '#71717a', fontSize: 12 }} />
-                      <Tooltip content={<CustomTooltip />} />
+                      <Tooltip content={<CustomTooltip currencySymbol={currencySymbol} />} />
                       <Bar dataKey="orders" fill="#2dd4bf" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>

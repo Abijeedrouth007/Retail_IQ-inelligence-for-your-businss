@@ -20,10 +20,12 @@ import {
   Users,
   Loader2
 } from 'lucide-react';
+import { formatCurrency, useConfig } from '../../contexts/ConfigContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const CustomersPage = () => {
+  const { currencySymbol } = useConfig();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -107,9 +109,9 @@ const CustomersPage = () => {
                   <div>
                     <p className="text-zinc-400 text-sm">Avg. Spent</p>
                     <p className="text-2xl font-bold font-['JetBrains_Mono']">
-                      ${customers.length > 0 
-                        ? (customers.reduce((acc, c) => acc + c.total_spent, 0) / customers.length).toFixed(2)
-                        : '0'
+                      {formatCurrency(customers.length > 0 
+                        ? (customers.reduce((acc, c) => acc + c.total_spent, 0) / customers.length)
+                        : 0, currencySymbol)
                       }
                     </p>
                   </div>
@@ -177,7 +179,7 @@ const CustomersPage = () => {
                         <TableCell className="text-zinc-400">{customer.phone || '-'}</TableCell>
                         <TableCell className="font-['JetBrains_Mono']">{customer.order_count}</TableCell>
                         <TableCell className="font-['JetBrains_Mono'] text-teal-400">
-                          ${customer.total_spent.toFixed(2)}
+                          {formatCurrency(customer.total_spent, currencySymbol)}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">

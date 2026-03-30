@@ -39,10 +39,12 @@ import {
   AlertTriangle,
   Loader2
 } from 'lucide-react';
+import { formatCurrency, useConfig } from '../../contexts/ConfigContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const InventoryPage = () => {
+  const { currencySymbol } = useConfig();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -272,7 +274,7 @@ const InventoryPage = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label>Price ($)</Label>
+                    <Label>Price ({currencySymbol})</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -284,7 +286,7 @@ const InventoryPage = () => {
                     />
                   </div>
                   <div>
-                    <Label>Cost Price ($)</Label>
+                    <Label>Cost Price ({currencySymbol})</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -424,7 +426,7 @@ const InventoryPage = () => {
                             </div>
                           </TableCell>
                           <TableCell className="text-zinc-400">{product.category}</TableCell>
-                          <TableCell className="font-['JetBrains_Mono']">${product.price.toFixed(2)}</TableCell>
+                          <TableCell className="font-['JetBrains_Mono']">{formatCurrency(product.price, currencySymbol)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {product.stock_quantity <= product.reorder_level && (

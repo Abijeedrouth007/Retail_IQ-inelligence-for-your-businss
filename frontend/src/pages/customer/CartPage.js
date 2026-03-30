@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -11,15 +12,20 @@ import {
   Trash2,
   Package,
   Loader2,
-  ArrowRight
+  ArrowRight,
+  CreditCard
 } from 'lucide-react';
+import { formatCurrency, useConfig } from '../../contexts/ConfigContext';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const CartPage = () => {
+  const navigate = useNavigate();
+  const { currencySymbol } = useConfig();
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
+  const [payingOnline, setPayingOnline] = useState(false);
 
   const fetchCart = async () => {
     const token = localStorage.getItem('token');
@@ -80,7 +86,7 @@ const CartPage = () => {
     }
   };
 
-  const placeOrder = async () => {
+  const placeOrderCOD = async () => {
     if (cartItems.length === 0) {
       toast.error('Cart is empty');
       return;
@@ -105,13 +111,9 @@ const CartPage = () => {
       });
 
       if (res.ok) {
-        // Clear cart
-        await fetch(`${API_URL}/api/cart`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
         setCartItems([]);
-        toast.success('Order placed successfully!');
+        toast.success('Order placed successfully! (Cash on Delivery)');
+        navigate('/orders');
       } else {
         const error = await res.json();
         toast.error(error.detail || 'Failed to place order');
@@ -120,6 +122,42 @@ const CartPage = () => {
       toast.error('Failed to place order');
     } finally {
       setPlacing(false);
+    }
+  };
+
+  const payOnline = async () => {
+    if (cartItems.length === 0) {
+      toast.error('Cart is empty');
+      return;
+    }
+
+    setPayingOnline(true);
+    const token = localStorage.getItem('token');
+    
+    try {
+      const res = await fetch(`${API_URL}/api/checkout/session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          origin_url: window.location.origin
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Redirect to Stripe checkout
+        window.location.href = data.checkout_url;
+      } else {
+        const error = await res.json();
+        toast.error(error.detail || 'Failed to initiate payment');
+      }
+    } catch (error) {
+      toast.error('Failed to initiate payment');
+    } finally {
+      setPayingOnline(false);
     }
   };
 
@@ -143,7 +181,7 @@ const CartPage = () => {
             <CardContent className="flex flex-col items-center justify-center py-20">
               <ShoppingCart className="w-16 h-16 text-zinc-600 mb-4" />
               <p className="text-lg text-zinc-400">Your cart is empty</p>
-              <Button className="mt-4" variant="outline" onClick={() => window.location.href = '/store'}>
+              <Button className="mt-4" variant="outline" onClick={() => navigate('/store')}>
                 Browse Products
               </Button>
             </CardContent>
@@ -174,7 +212,7 @@ const CartPage = () => {
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold mb-1">{item.product_name}</h3>
                           <p className="text-lg font-['JetBrains_Mono'] text-violet-400">
-                            ${item.price.toFixed(2)}
+                            {formatCurrency(item.price, currencySymbol)}
                           </p>
                           <div className="flex items-center gap-3 mt-3">
                             <div className="flex items-center gap-2 bg-zinc-800 rounded-lg">
@@ -211,7 +249,7 @@ const CartPage = () => {
                         </div>
                         <div className="text-right">
                           <p className="font-['JetBrains_Mono'] text-lg">
-                            ${(item.price * item.quantity).toFixed(2)}
+                            {formatCurrency(item.price * item.quantity, currencySymbol)}
                           </p>
                         </div>
                       </div>
@@ -235,7 +273,7 @@ const CartPage = () => {
                           {item.product_name} x{item.quantity}
                         </span>
                         <span className="font-['JetBrains_Mono']">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          {formatCurrency(item.price * item.quantity, currencySymbol)}
                         </span>
                       </div>
                     ))}
@@ -244,23 +282,40 @@ const CartPage = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-semibold">Total</span>
                       <span className="text-2xl font-bold font-['JetBrains_Mono'] text-violet-400">
-                        ${total.toFixed(2)}
+                        {formatCurrency(total, currencySymbol)}
                       </span>
                     </div>
                   </div>
-                  <Button
-                    className="w-full btn-primary"
-                    onClick={placeOrder}
-                    disabled={placing}
-                    data-testid="place-order-btn"
-                  >
-                    {placing ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    ) : (
-                      <ArrowRight className="w-4 h-4 mr-2" />
-                    )}
-                    Place Order
-                  </Button>
+                  
+                  <div className="space-y-3 pt-2">
+                    <Button
+                      className="w-full btn-primary"
+                      onClick={payOnline}
+                      disabled={payingOnline || placing}
+                      data-testid="pay-online-btn"
+                    >
+                      {payingOnline ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <CreditCard className="w-4 h-4 mr-2" />
+                      )}
+                      Pay Online
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={placeOrderCOD}
+                      disabled={placing || payingOnline}
+                      data-testid="place-order-btn"
+                    >
+                      {placing ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <ArrowRight className="w-4 h-4 mr-2" />
+                      )}
+                      Cash on Delivery
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </div>
