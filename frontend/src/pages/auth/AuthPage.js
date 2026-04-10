@@ -286,9 +286,20 @@ const AuthPage = () => {
             Continue with Google
           </Button>
 
-          <p className="text-center text-xs text-zinc-500 mt-6">
-            Demo credentials: admin@retailiq.com / admin123
-          </p>
+          {/* Admin Demo Credentials */}
+          <div className="mt-6 p-4 bg-violet-500/10 border border-violet-500/30 rounded-lg" data-testid="demo-credentials">
+            <p className="text-center text-sm text-zinc-300 font-medium mb-2">
+              Admin Demo Login
+            </p>
+            <div className="flex items-center justify-center gap-2 text-sm">
+              <span className="text-zinc-400">Email:</span>
+              <code className="bg-zinc-800 px-2 py-1 rounded text-violet-400 font-mono text-xs">admin@retailiq.com</code>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-sm mt-1">
+              <span className="text-zinc-400">Password:</span>
+              <code className="bg-zinc-800 px-2 py-1 rounded text-violet-400 font-mono text-xs">admin123</code>
+            </div>
+          </div>
         </div>
       </motion.div>
     </div>

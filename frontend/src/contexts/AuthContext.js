@@ -60,12 +60,12 @@ export const AuthProvider = ({ children }) => {
       credentials: 'include'
     });
 
+    const data = await response.json();
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Login failed');
+      throw new Error(data.detail || 'Login failed');
     }
 
-    const data = await response.json();
     localStorage.setItem('token', data.token);
     setToken(data.token);
     setUser(data.user);
@@ -80,12 +80,12 @@ export const AuthProvider = ({ children }) => {
       credentials: 'include'
     });
 
+    const data = await response.json();
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Signup failed');
+      throw new Error(data.detail || 'Signup failed');
     }
 
-    const data = await response.json();
     localStorage.setItem('token', data.token);
     setToken(data.token);
     setUser(data.user);

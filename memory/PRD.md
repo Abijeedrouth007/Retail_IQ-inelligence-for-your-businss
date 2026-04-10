@@ -9,26 +9,36 @@ Build RetailIQ - an AI-powered retail management and analytics SaaS platform for
 - **Database**: MongoDB
 - **Authentication**: JWT + Emergent Google OAuth
 - **AI Integration**: Gemini 3 Flash via Emergent Integrations
+- **Payments**: Stripe (test mode)
+- **Email**: SendGrid (placeholder)
+
+## Currency
+- **Indian Rupees (INR)** - ₹ symbol
 
 ## User Personas
-1. **Admin (Shop Owner)**: Manages inventory, views analytics, tracks sales, manages customers and suppliers
-2. **Customer**: Browses products, manages cart/wishlist, places orders, views order history
+1. **Admin (Shop Owner)**: Manages inventory, views analytics, tracks sales, manages customers and suppliers, updates order statuses
+2. **Customer**: Browses products, manages cart/wishlist, places orders via COD or online payment, views order history with status tracking
 
 ## Core Requirements (Static)
 - Role-based access control (admin/customer)
 - Product inventory management with stock tracking
-- Customer order management
+- Customer order management with status workflow
 - Analytics dashboard with revenue/sales charts
 - AI chatbot for retail insights
-- Google Maps integration (placeholder)
+- Payment integration (Stripe)
+- Email notifications for orders
 
-## What's Been Implemented (MVP - Jan 2026)
+## What's Been Implemented (Jan 2026)
 
-### Backend
+### Backend (40+ API endpoints)
 - User authentication (signup, login, Google OAuth)
 - JWT token-based session management
 - Products CRUD API
 - Orders API with stock management
+- Order status workflow (pending → confirmed → shipped → delivered)
+- Stripe checkout session creation
+- Payment webhook handling
+- SendGrid email notifications (placeholder)
 - Suppliers CRUD API
 - Cart and Wishlist APIs
 - Analytics endpoints (dashboard stats, sales trends, top products)
@@ -37,35 +47,36 @@ Build RetailIQ - an AI-powered retail management and analytics SaaS platform for
 ### Frontend
 - Landing page with cinematic hero section
 - Auth page (login/signup/Google OAuth)
-- Admin Dashboard with KPIs and charts
+- Admin Dashboard with KPIs and charts (INR)
 - Analytics page with revenue insights
 - Inventory management with add/edit/delete
 - Customer management page
-- Sales page with CSV export
+- Sales page with order status management dropdown
 - Suppliers management
-- Customer store with product grid
-- Shopping cart page
-- Order history with reorder
+- Customer store with product grid, Cart & Buy Now buttons
+- Shopping cart page with Pay Online & Cash on Delivery options
+- Order history with status timeline (pending → confirmed → shipped → delivered)
 - Wishlist page
 - AI Chatbot (floating widget)
+- Checkout success/cancel pages
 - Responsive sidebar navigation
 
 ### Database Collections
 - users, user_sessions, user_roles
 - products, orders, suppliers
 - cart_items, wishlist
-- chat_messages
+- chat_messages, payment_transactions
 
 ## Prioritized Backlog
 
 ### P0 (Critical - Immediate)
-- None (MVP complete)
+- None (MVP + payments complete)
 
 ### P1 (High Priority)
-- Email notifications for orders
-- Product search autocomplete
-- Order status updates (pending, shipped, delivered)
-- Payment integration (Stripe)
+- Real SendGrid API key integration
+- Real Stripe key for production
+- Invoice generation (PDF)
+- Multi-language support (Hindi)
 
 ### P2 (Medium Priority)
 - Multi-store support
@@ -79,6 +90,7 @@ Build RetailIQ - an AI-powered retail management and analytics SaaS platform for
 - Supplier order management
 - Advanced AI demand forecasting
 - Mobile app (React Native)
+- WhatsApp notifications
 
 ## Demo Credentials
 - **Admin**: admin@retailiq.com / admin123
@@ -89,15 +101,19 @@ Build RetailIQ - an AI-powered retail management and analytics SaaS platform for
 - GET /api/auth/me
 - GET/POST/PUT/DELETE /api/products
 - GET/POST /api/orders
+- PUT /api/orders/{order_id}/status (admin)
+- POST /api/checkout/session, /api/checkout/buy-now
+- GET /api/checkout/status/{session_id}
+- POST /api/webhook/stripe
 - GET/POST/PUT/DELETE /api/suppliers
 - GET/POST/PUT/DELETE /api/cart
 - GET/POST/DELETE /api/wishlist
 - GET /api/analytics/dashboard, sales-trend, top-products, customers
 - POST /api/chat
+- GET /api/config
 
 ## Next Tasks
-1. Add payment processing with Stripe
-2. Implement email notifications
-3. Add order status workflow
-4. Create admin settings page
-5. Add product bulk import/export
+1. Add real SendGrid API key for order notifications
+2. Add real Stripe key for production payments
+3. Implement invoice PDF generation
+4. Add Hindi language support
