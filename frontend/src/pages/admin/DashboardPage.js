@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import StoreMap from '../../components/maps/StoreMap';
 import {
   AreaChart,
   Area,
@@ -23,6 +24,7 @@ import {
   AlertTriangle,
   TrendingUp,
   TrendingDown,
+  MapPin
 } from 'lucide-react';
 import { formatCurrency, useConfig } from '../../contexts/ConfigContext';
 
@@ -344,6 +346,25 @@ const DashboardPage = () => {
             </Card>
           </motion.div>
         </div>
+
+        {/* Store Locations Map */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+        >
+          <Card className="bg-zinc-900/50 border-zinc-800">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-violet-400" />
+                Store Locations
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <StoreMap height="350px" />
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </DashboardLayout>
   );

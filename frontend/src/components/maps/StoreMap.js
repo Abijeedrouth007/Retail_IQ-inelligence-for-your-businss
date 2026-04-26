@@ -1,136 +1,90 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { MapPin, Store } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+// Fix default marker icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 
-const StoreMap = ({ 
-  storeLocation = { lat: 40.7128, lng: -74.0060 }, // Default: NYC
-  storeName = "RetailIQ Store"
-}) => {
-  const mapRef = useRef(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [error, setError] = useState(null);
+// Sample store locations (replace with API data)
+const SAMPLE_STORES = [
+  { id: 1, name: 'RetailIQ Store - Mumbai', lat: 19.0760, lng: 72.8777 },
+  { id: 2, name: 'RetailIQ Store - Delhi', lat: 28.6139, lng: 77.2090 },
+  { id: 3, name: 'RetailIQ Store - Bangalore', lat: 12.9716, lng: 77.5946 },
+  { id: 4, name: 'RetailIQ Store - Chennai', lat: 13.0827, lng: 80.2707 },
+  { id: 5, name: 'RetailIQ Store - Kolkata', lat: 22.5726, lng: 88.3639 },
+];
+
+// Component to recenter map
+function RecenterMap({ center }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center) map.setView(center, 12);
+  }, [center, map]);
+  return null;
+}
+
+const StoreMap = ({ stores = SAMPLE_STORES, height = '400px' }) => {
+  const [userLocation, setUserLocation] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const defaultCenter = [20.5937, 78.9629]; // India center
 
   useEffect(() => {
-    // Check if API key is placeholder
-    if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY === 'YOUR_GOOGLE_MAPS_API_KEY') {
-      setError('Google Maps API key not configured');
-      return;
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation([pos.coords.latitude, pos.coords.longitude]);
+          setLoading(false);
+        },
+        () => setLoading(false),
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else {
+      setLoading(false);
     }
+  }, []);
 
-    // Load Google Maps script
-    const loadGoogleMaps = () => {
-      if (window.google && window.google.maps) {
-        initMap();
-        return;
-      }
+  const center = userLocation || defaultCenter;
 
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
-      script.async = true;
-      script.defer = true;
-      script.onload = initMap;
-      script.onerror = () => setError('Failed to load Google Maps');
-      document.head.appendChild(script);
-    };
-
-    const initMap = () => {
-      if (!mapRef.current || !window.google) return;
-
-      const map = new window.google.maps.Map(mapRef.current, {
-        center: storeLocation,
-        zoom: 15,
-        styles: [
-          { elementType: "geometry", stylers: [{ color: "#1d1d1d" }] },
-          { elementType: "labels.text.stroke", stylers: [{ color: "#1d1d1d" }] },
-          { elementType: "labels.text.fill", stylers: [{ color: "#8c8c8c" }] },
-          { featureType: "road", elementType: "geometry", stylers: [{ color: "#2d2d2d" }] },
-          { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-          { featureType: "water", elementType: "geometry", stylers: [{ color: "#0d1117" }] },
-          { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }
-        ],
-        disableDefaultUI: true,
-        zoomControl: true
-      });
-
-      new window.google.maps.Marker({
-        position: storeLocation,
-        map: map,
-        title: storeName,
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          scale: 12,
-          fillColor: "#7c3aed",
-          fillOpacity: 1,
-          strokeColor: "#ffffff",
-          strokeWeight: 2
-        }
-      });
-
-      setMapLoaded(true);
-    };
-
-    loadGoogleMaps();
-  }, [storeLocation, storeName]);
-
-  if (error) {
+  if (loading) {
     return (
-      <Card className="bg-zinc-900/50 border-zinc-800">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-violet-400" />
-            Store Location
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px] bg-zinc-800 rounded-lg flex flex-col items-center justify-center">
-            <Store className="w-12 h-12 text-zinc-600 mb-4" />
-            <p className="text-zinc-400 text-center">
-              {error === 'Google Maps API key not configured' 
-                ? 'Map preview not available. Configure Google Maps API key to enable.'
-                : error
-              }
-            </p>
-            <div className="mt-4 text-sm text-zinc-500">
-              <p>{storeName}</p>
-              <p>Lat: {storeLocation.lat.toFixed(4)}, Lng: {storeLocation.lng.toFixed(4)}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a1a', borderRadius: '12px' }}>
+        <span style={{ color: '#888' }}>Loading map...</span>
+      </div>
     );
   }
 
   return (
-    <Card className="bg-zinc-900/50 border-zinc-800">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-violet-400" />
-          Store Location
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div 
-          ref={mapRef} 
-          className="h-[300px] rounded-lg overflow-hidden"
-          style={{ 
-            background: mapLoaded ? 'transparent' : '#1d1d1d' 
-          }}
-        />
-        <div className="mt-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
-            <Store className="w-5 h-5 text-violet-400" />
-          </div>
-          <div>
-            <p className="font-medium">{storeName}</p>
-            <p className="text-sm text-zinc-500">
-              {storeLocation.lat.toFixed(4)}, {storeLocation.lng.toFixed(4)}
-            </p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <MapContainer
+      center={center}
+      zoom={userLocation ? 12 : 5}
+      style={{ height, width: '100%', borderRadius: '12px' }}
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      <RecenterMap center={center} />
+      
+      {/* User location marker */}
+      {userLocation && (
+        <Marker position={userLocation}>
+          <Popup>Your Location</Popup>
+        </Marker>
+      )}
+      
+      {/* Store markers */}
+      {stores.map((store) => (
+        <Marker key={store.id} position={[store.lat, store.lng]}>
+          <Popup>{store.name}</Popup>
+        </Marker>
+      ))}
+    </MapContainer>
   );
 };
 

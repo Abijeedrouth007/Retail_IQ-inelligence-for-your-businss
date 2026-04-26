@@ -4,7 +4,7 @@
 Build RetailIQ - an AI-powered retail management and analytics SaaS platform for small shop owners and customers.
 
 ## Tech Stack
-- **Frontend**: React 18, Tailwind CSS, shadcn/ui, Framer Motion, Recharts
+- **Frontend**: React 18, Tailwind CSS, shadcn/ui, Framer Motion, Recharts, Leaflet
 - **Backend**: FastAPI (Python)
 - **Database**: MongoDB
 - **Authentication**: JWT + Emergent Google OAuth + OTP via Twilio
@@ -12,6 +12,7 @@ Build RetailIQ - an AI-powered retail management and analytics SaaS platform for
 - **Payments**: Stripe (test mode)
 - **Email**: SendGrid (placeholder)
 - **SMS**: Twilio (OTP verification)
+- **Maps**: Leaflet + OpenStreetMap (FREE, no API key needed)
 
 ## Currency
 - **Indian Rupees (INR)** - ₹ symbol

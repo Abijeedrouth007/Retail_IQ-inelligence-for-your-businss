@@ -114,13 +114,13 @@ const StorePage = () => {
         })
       });
 
+      const data = await res.json();
+      
       if (res.ok) {
-        const data = await res.json();
         // Redirect to Stripe checkout
         window.location.href = data.checkout_url;
       } else {
-        const error = await res.json();
-        toast.error(error.detail || 'Failed to initiate checkout');
+        toast.error(data.detail || 'Failed to initiate checkout');
       }
     } catch (error) {
       toast.error('Failed to initiate checkout');
