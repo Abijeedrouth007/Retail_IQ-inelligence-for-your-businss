@@ -11,6 +11,8 @@ import ChatBot from './components/chatbot/ChatBot';
 // Pages
 import LandingPage from './pages/landing/LandingPage';
 import AuthPage from './pages/auth/AuthPage';
+import PricingPage from './pages/pricing/PricingPage';
+import MerchantOnboardingPage from './pages/merchant/MerchantOnboardingPage';
 import DashboardPage from './pages/admin/DashboardPage';
 import AnalyticsPage from './pages/admin/AnalyticsPage';
 import InventoryPage from './pages/admin/InventoryPage';
@@ -49,6 +51,8 @@ function AppRouter() {
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/merchant/onboarding" element={<MerchantOnboardingPage />} />
         
         {/* Checkout Routes */}
         <Route path="/checkout/success" element={<CheckoutSuccessPage />} />

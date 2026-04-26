@@ -219,6 +219,64 @@ class BuyNowRequest(BaseModel):
     quantity: int = 1
     origin_url: str
 
+# ===================== MERCHANT ONBOARDING MODELS =====================
+
+class SendOTPRequest(BaseModel):
+    phone_number: str  # E.164 format: +91XXXXXXXXXX
+
+class VerifyOTPRequest(BaseModel):
+    phone_number: str
+    code: str
+
+class MerchantBusinessInfo(BaseModel):
+    shop_name: str
+    business_category: str
+    store_address: str
+    city: str
+    state: str
+    pincode: str
+
+class MerchantKYCInfo(BaseModel):
+    gstin: Optional[str] = None  # Optional for small retailers
+    pan_number: str
+    bank_account_number: str
+    bank_ifsc: str
+    bank_name: str
+    account_holder_name: str
+
+class MerchantOnboardingRequest(BaseModel):
+    phone_number: str
+    email: EmailStr
+    password: str
+    name: str
+    business_info: MerchantBusinessInfo
+    kyc_info: MerchantKYCInfo
+    subscription_plan: str = "starter"  # starter, pro, enterprise
+
+class MerchantResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    merchant_id: str
+    user_id: str
+    email: str
+    name: str
+    phone: str
+    shop_name: str
+    business_category: str
+    store_address: str
+    subscription_plan: str
+    kyc_status: str  # pending, verified, rejected
+    onboarding_status: str  # phone_verified, business_info, kyc_submitted, active
+    created_at: datetime
+
+class SubscriptionPlan(BaseModel):
+    plan_id: str
+    name: str
+    price: float
+    currency: str = "INR"
+    features: List[str]
+    product_limit: Optional[int] = None
+    is_popular: bool = False
+
 # ===================== EMAIL SERVICE =====================
 
 async def send_order_email(to_email: str, order: dict, email_type: str = "confirmation"):
@@ -526,6 +584,276 @@ async def logout(request: Request, response: Response):
     
     response.delete_cookie(key="session_token", path="/", secure=True, samesite="none")
     return {"message": "Logged out"}
+
+# ===================== MERCHANT ONBOARDING ROUTES =====================
+
+# Initialize Twilio client
+def get_twilio_client():
+    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+    if not account_sid or not auth_token:
+        return None
+    from twilio.rest import Client
+    return Client(account_sid, auth_token)
+
+@api_router.post("/merchant/send-otp")
+async def send_otp(request: SendOTPRequest):
+    """Send OTP to phone number for merchant verification"""
+    twilio_client = get_twilio_client()
+    verify_service = os.environ.get("TWILIO_VERIFY_SERVICE")
+    
+    if not twilio_client or not verify_service:
+        raise HTTPException(status_code=500, detail="SMS service not configured. Please contact support.")
+    
+    try:
+        # Ensure phone number is in E.164 format
+        phone = request.phone_number
+        if not phone.startswith("+"):
+            phone = f"+91{phone}"  # Default to India
+        
+        verification = twilio_client.verify.v2.services(verify_service) \
+            .verifications.create(to=phone, channel="sms")
+        
+        # Store OTP request for tracking
+        await db.otp_requests.insert_one({
+            "phone_number": phone,
+            "status": verification.status,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        return {"status": verification.status, "message": "OTP sent successfully"}
+    except Exception as e:
+        logger.error(f"OTP send error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/merchant/verify-otp")
+async def verify_otp(request: VerifyOTPRequest):
+    """Verify OTP code for merchant phone verification"""
+    twilio_client = get_twilio_client()
+    verify_service = os.environ.get("TWILIO_VERIFY_SERVICE")
+    
+    if not twilio_client or not verify_service:
+        raise HTTPException(status_code=500, detail="SMS service not configured")
+    
+    try:
+        phone = request.phone_number
+        if not phone.startswith("+"):
+            phone = f"+91{phone}"
+        
+        verification_check = twilio_client.verify.v2.services(verify_service) \
+            .verification_checks.create(to=phone, code=request.code)
+        
+        is_valid = verification_check.status == "approved"
+        
+        # Update verification status
+        if is_valid:
+            await db.phone_verifications.update_one(
+                {"phone_number": phone},
+                {
+                    "$set": {
+                        "verified": True,
+                        "verified_at": datetime.now(timezone.utc).isoformat()
+                    }
+                },
+                upsert=True
+            )
+        
+        return {"valid": is_valid, "status": verification_check.status}
+    except Exception as e:
+        logger.error(f"OTP verify error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/merchant/register")
+async def register_merchant(data: MerchantOnboardingRequest):
+    """Complete merchant registration after phone verification"""
+    
+    # Check if phone is verified
+    phone = data.phone_number
+    if not phone.startswith("+"):
+        phone = f"+91{phone}"
+    
+    phone_verified = await db.phone_verifications.find_one(
+        {"phone_number": phone, "verified": True}, {"_id": 0}
+    )
+    
+    if not phone_verified:
+        raise HTTPException(status_code=400, detail="Phone number not verified. Please verify OTP first.")
+    
+    # Check if email already exists
+    existing_user = await db.users.find_one({"email": data.email}, {"_id": 0})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Check if phone already registered
+    existing_merchant = await db.merchants.find_one({"phone": phone}, {"_id": 0})
+    if existing_merchant:
+        raise HTTPException(status_code=400, detail="Phone number already registered as merchant")
+    
+    # Create user account
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    merchant_id = f"merch_{uuid.uuid4().hex[:12]}"
+    
+    # Create user
+    await db.users.insert_one({
+        "user_id": user_id,
+        "email": data.email,
+        "name": data.name,
+        "phone": phone,
+        "password_hash": hash_password(data.password),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Set role as admin (merchant is admin of their store)
+    await db.user_roles.insert_one({"user_id": user_id, "role": "admin"})
+    
+    # Create merchant profile
+    merchant_doc = {
+        "merchant_id": merchant_id,
+        "user_id": user_id,
+        "email": data.email,
+        "name": data.name,
+        "phone": phone,
+        "shop_name": data.business_info.shop_name,
+        "business_category": data.business_info.business_category,
+        "store_address": data.business_info.store_address,
+        "city": data.business_info.city,
+        "state": data.business_info.state,
+        "pincode": data.business_info.pincode,
+        "kyc_info": {
+            "gstin": data.kyc_info.gstin,
+            "pan_number": data.kyc_info.pan_number,
+            "bank_account_number": data.kyc_info.bank_account_number[-4:],  # Store only last 4 digits
+            "bank_ifsc": data.kyc_info.bank_ifsc,
+            "bank_name": data.kyc_info.bank_name,
+            "account_holder_name": data.kyc_info.account_holder_name
+        },
+        "subscription_plan": data.subscription_plan,
+        "kyc_status": "pending",
+        "onboarding_status": "active",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.merchants.insert_one(merchant_doc)
+    
+    # Generate token
+    token = create_jwt_token(user_id)
+    
+    return {
+        "token": token,
+        "merchant": {
+            "merchant_id": merchant_id,
+            "user_id": user_id,
+            "email": data.email,
+            "name": data.name,
+            "phone": phone,
+            "shop_name": data.business_info.shop_name,
+            "subscription_plan": data.subscription_plan,
+            "kyc_status": "pending"
+        }
+    }
+
+@api_router.get("/merchant/profile")
+async def get_merchant_profile(user: UserResponse = Depends(get_current_user)):
+    """Get merchant profile for logged in user"""
+    merchant = await db.merchants.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant profile not found")
+    return merchant
+
+@api_router.get("/subscription/plans")
+async def get_subscription_plans():
+    """Get available subscription plans"""
+    plans = [
+        {
+            "plan_id": "starter",
+            "name": "Starter",
+            "price": 0,
+            "currency": "INR",
+            "billing_period": "month",
+            "features": [
+                "Up to 50 products",
+                "Basic analytics dashboard",
+                "Email support",
+                "1 user account",
+                "Standard reports"
+            ],
+            "product_limit": 50,
+            "is_popular": False
+        },
+        {
+            "plan_id": "pro",
+            "name": "Pro",
+            "price": 999,
+            "currency": "INR",
+            "billing_period": "month",
+            "features": [
+                "Unlimited products",
+                "Advanced AI analytics",
+                "Smart Reorder alerts",
+                "Priority support",
+                "5 user accounts",
+                "Custom reports",
+                "Inventory forecasting"
+            ],
+            "product_limit": None,
+            "is_popular": True
+        },
+        {
+            "plan_id": "enterprise",
+            "name": "Enterprise",
+            "price": 2999,
+            "currency": "INR",
+            "billing_period": "month",
+            "features": [
+                "Everything in Pro",
+                "API access",
+                "Dedicated account manager",
+                "Custom integrations",
+                "Unlimited users",
+                "White-label options",
+                "24/7 phone support",
+                "Multi-store management"
+            ],
+            "product_limit": None,
+            "is_popular": False
+        }
+    ]
+    return plans
+
+@api_router.post("/merchant/upload-document")
+async def upload_kyc_document(
+    document_type: str,
+    request: Request,
+    user: UserResponse = Depends(get_current_user)
+):
+    """Upload KYC document (stored locally for demo)"""
+    import base64
+    
+    body = await request.json()
+    file_data = body.get("file_data")  # Base64 encoded file
+    file_name = body.get("file_name")
+    
+    if not file_data or not file_name:
+        raise HTTPException(status_code=400, detail="File data and name required")
+    
+    # Store document reference
+    doc_id = f"doc_{uuid.uuid4().hex[:12]}"
+    await db.kyc_documents.insert_one({
+        "doc_id": doc_id,
+        "user_id": user.user_id,
+        "document_type": document_type,
+        "file_name": file_name,
+        "file_size": len(file_data),
+        "status": "uploaded",
+        "uploaded_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Update merchant KYC status
+    await db.merchants.update_one(
+        {"user_id": user.user_id},
+        {"$set": {"kyc_status": "documents_submitted"}}
+    )
+    
+    return {"doc_id": doc_id, "message": "Document uploaded successfully"}
 
 # ===================== PRODUCTS ROUTES =====================
 

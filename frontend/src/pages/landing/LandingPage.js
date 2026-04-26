@@ -12,7 +12,11 @@ import {
   CheckCircle,
   Zap,
   Shield,
-  Globe
+  Globe,
+  Store,
+  Sparkles,
+  IndianRupee,
+  TrendingUp
 } from 'lucide-react';
 
 const LandingPage = () => {
@@ -71,6 +75,14 @@ const LandingPage = () => {
             <div className="flex items-center gap-4">
               <Button 
                 variant="ghost" 
+                onClick={() => navigate('/pricing')}
+                className="text-zinc-400 hover:text-white hidden sm:inline-flex"
+                data-testid="nav-pricing-btn"
+              >
+                Pricing
+              </Button>
+              <Button 
+                variant="ghost" 
                 onClick={() => navigate('/auth')}
                 className="text-zinc-400 hover:text-white"
                 data-testid="nav-login-btn"
@@ -78,11 +90,12 @@ const LandingPage = () => {
                 Login
               </Button>
               <Button 
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate('/merchant/onboarding')}
                 className="btn-primary rounded-full px-6"
-                data-testid="nav-get-started-btn"
+                data-testid="nav-partner-btn"
               >
-                Get Started
+                <Store className="w-4 h-4 mr-2" />
+                Partner with Us
               </Button>
             </div>
           </div>
@@ -123,21 +136,21 @@ const LandingPage = () => {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button 
                 size="lg"
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate('/merchant/onboarding')}
                 className="btn-primary rounded-full px-8 py-6 text-lg"
-                data-testid="hero-get-started-btn"
+                data-testid="hero-partner-btn"
               >
-                Start Free Trial
-                <ArrowRight className="ml-2 w-5 h-5" />
+                <Store className="mr-2 w-5 h-5" />
+                Partner with Us
               </Button>
               <Button 
                 size="lg"
                 variant="outline"
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate('/pricing')}
                 className="rounded-full px-8 py-6 text-lg border-zinc-700 hover:bg-zinc-800"
-                data-testid="hero-demo-btn"
+                data-testid="hero-pricing-btn"
               >
-                View Demo
+                View Pricing
               </Button>
             </div>
           </motion.div>
@@ -307,13 +320,148 @@ const LandingPage = () => {
                     Based on this week's sales data, your top 3 products are:
                   </p>
                   <ul className="mt-2 space-y-1 text-sm text-zinc-400">
-                    <li>1. Wireless Earbuds - 47 units ($3,759)</li>
-                    <li>2. Smart Watch - 23 units ($6,899)</li>
-                    <li>3. Cotton T-Shirt - 89 units ($2,224)</li>
+                    <li>1. Wireless Earbuds - 47 units (₹3,759)</li>
+                    <li>2. Smart Watch - 23 units (₹6,899)</li>
+                    <li>3. Cotton T-Shirt - 89 units (₹2,224)</li>
                   </ul>
                 </div>
               </div>
             </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Preview Section */}
+      <section className="py-20 lg:py-32 px-6 lg:px-12 bg-zinc-900/30">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-3xl lg:text-5xl font-bold font-['Outfit'] mb-4">
+              Simple, Transparent Pricing
+            </h2>
+            <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
+              Start free, scale as you grow. No hidden fees.
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
+            {/* Starter Plan */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0 }}
+              className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 lg:p-8"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Zap className="w-5 h-5 text-violet-400" />
+                <h3 className="text-xl font-bold font-['Outfit']">Starter</h3>
+              </div>
+              <div className="mb-6">
+                <span className="text-4xl font-bold">Free</span>
+              </div>
+              <ul className="space-y-3 mb-8">
+                {['Up to 50 products', 'Basic analytics', 'Email support'].map((item, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-zinc-400">
+                    <CheckCircle className="w-4 h-4 text-teal-400" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Button 
+                onClick={() => navigate('/merchant/onboarding')}
+                variant="outline"
+                className="w-full border-zinc-700 hover:bg-zinc-800"
+              >
+                Start Free
+              </Button>
+            </motion.div>
+
+            {/* Pro Plan */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1 }}
+              className="bg-gradient-to-b from-violet-500/20 to-transparent border-2 border-violet-500 rounded-2xl p-6 lg:p-8 relative"
+            >
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="px-3 py-1 bg-violet-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" />
+                  POPULAR
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-5 h-5 text-violet-400" />
+                <h3 className="text-xl font-bold font-['Outfit']">Pro</h3>
+              </div>
+              <div className="mb-6">
+                <span className="text-4xl font-bold">₹999</span>
+                <span className="text-zinc-400">/month</span>
+              </div>
+              <ul className="space-y-3 mb-8">
+                {['Unlimited products', 'Smart Reorder alerts', 'AI analytics', 'Priority support'].map((item, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-zinc-300">
+                    <CheckCircle className="w-4 h-4 text-teal-400" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Button 
+                onClick={() => navigate('/merchant/onboarding')}
+                className="w-full btn-primary"
+              >
+                Get Started
+              </Button>
+            </motion.div>
+
+            {/* Enterprise Plan */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 lg:p-8"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="w-5 h-5 text-violet-400" />
+                <h3 className="text-xl font-bold font-['Outfit']">Enterprise</h3>
+              </div>
+              <div className="mb-6">
+                <span className="text-4xl font-bold">₹2,999</span>
+                <span className="text-zinc-400">/month</span>
+              </div>
+              <ul className="space-y-3 mb-8">
+                {['Everything in Pro', 'API access', 'Dedicated manager', 'Multi-store'].map((item, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-zinc-400">
+                    <CheckCircle className="w-4 h-4 text-teal-400" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Button 
+                onClick={() => navigate('/merchant/onboarding')}
+                variant="outline"
+                className="w-full border-zinc-700 hover:bg-zinc-800"
+              >
+                Contact Sales
+              </Button>
+            </motion.div>
+          </div>
+
+          <div className="text-center mt-8">
+            <Button 
+              variant="link" 
+              onClick={() => navigate('/pricing')}
+              className="text-violet-400 hover:text-violet-300"
+            >
+              View full pricing comparison
+              <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
           </div>
         </div>
       </section>
@@ -336,14 +484,14 @@ const LandingPage = () => {
             </p>
             <Button 
               size="lg"
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate('/merchant/onboarding')}
               className="btn-primary rounded-full px-10 py-6 text-lg"
               data-testid="cta-get-started-btn"
             >
-              Start Your Free Trial
-              <ArrowRight className="ml-2 w-5 h-5" />
+              <Store className="mr-2 w-5 h-5" />
+              Partner with Us Today
             </Button>
-            <p className="text-zinc-500 text-sm mt-6">No credit card required</p>
+            <p className="text-zinc-500 text-sm mt-6">No credit card required • Start free</p>
           </motion.div>
         </div>
       </section>
