@@ -19,6 +19,7 @@ import InventoryPage from './pages/admin/InventoryPage';
 import CustomersPage from './pages/admin/CustomersPage';
 import SalesPage from './pages/admin/SalesPage';
 import SuppliersPage from './pages/admin/SuppliersPage';
+import ReferralPage from './pages/admin/ReferralPage';
 import StorePage from './pages/store/StorePage';
 import CartPage from './pages/customer/CartPage';
 import OrdersPage from './pages/customer/OrdersPage';
@@ -76,6 +77,9 @@ function AppRouter() {
         } />
         <Route path="/admin/suppliers" element={
           <AdminRoute><SuppliersPage /></AdminRoute>
+        } />
+        <Route path="/admin/referrals" element={
+          <AdminRoute><ReferralPage /></AdminRoute>
         } />
 
         {/* Customer Routes */}

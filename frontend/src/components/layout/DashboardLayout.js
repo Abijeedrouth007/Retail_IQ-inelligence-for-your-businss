@@ -28,7 +28,8 @@ import {
   Menu,
   X,
   ChevronLeft,
-  ShoppingBag
+  ShoppingBag,
+  Gift
 } from 'lucide-react';
 
 const adminMenuItems = [
@@ -38,6 +39,7 @@ const adminMenuItems = [
   { icon: Users, label: 'Customers', path: '/admin/customers' },
   { icon: DollarSign, label: 'Sales', path: '/admin/sales' },
   { icon: Truck, label: 'Suppliers', path: '/admin/suppliers' },
+  { icon: Gift, label: 'Referrals', path: '/admin/referrals' },
 ];
 
 const customerMenuItems = [

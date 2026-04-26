@@ -277,6 +277,45 @@ class SubscriptionPlan(BaseModel):
     product_limit: Optional[int] = None
     is_popular: bool = False
 
+# ===================== REFERRAL PROGRAM MODELS =====================
+
+class ReferralCreate(BaseModel):
+    referrer_code: Optional[str] = None  # Code used during signup
+
+class ReferralResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    referral_id: str
+    user_id: str
+    referral_code: str
+    total_referrals: int = 0
+    successful_referrals: int = 0
+    credits_earned: float = 0.0
+    created_at: datetime
+
+class ReferralHistoryItem(BaseModel):
+    referred_user_id: str
+    referred_user_name: str
+    referred_user_email: str
+    status: str  # pending, completed
+    credits_earned: float
+    created_at: datetime
+
+class ReferralStatsResponse(BaseModel):
+    referral_code: str
+    total_referrals: int
+    successful_referrals: int
+    pending_referrals: int
+    total_credits_earned: float
+    available_credits: float
+    referral_link: str
+
+class RedeemCreditsRequest(BaseModel):
+    amount: float
+
+# Referral reward settings
+REFERRAL_REWARD_REFERRER = 100.0  # ₹100 for referrer when referee completes first order
+REFERRAL_REWARD_REFEREE = 50.0   # ₹50 discount for new user on first order
+
 # ===================== EMAIL SERVICE =====================
 
 async def send_order_email(to_email: str, order: dict, email_type: str = "confirmation"):
@@ -855,6 +894,273 @@ async def upload_kyc_document(
     
     return {"doc_id": doc_id, "message": "Document uploaded successfully"}
 
+# ===================== REFERRAL PROGRAM ROUTES =====================
+
+def generate_referral_code(user_id: str) -> str:
+    """Generate a unique referral code"""
+    import hashlib
+    hash_input = f"{user_id}_{datetime.now(timezone.utc).isoformat()}"
+    return hashlib.md5(hash_input.encode()).hexdigest()[:8].upper()
+
+@api_router.get("/referral/my-code")
+async def get_my_referral_code(user: UserResponse = Depends(get_current_user)):
+    """Get or create referral code for current user"""
+    referral = await db.referrals.find_one({"user_id": user.user_id}, {"_id": 0})
+    
+    if not referral:
+        # Create new referral entry
+        referral_code = generate_referral_code(user.user_id)
+        referral = {
+            "referral_id": f"ref_{uuid.uuid4().hex[:12]}",
+            "user_id": user.user_id,
+            "referral_code": referral_code,
+            "total_referrals": 0,
+            "successful_referrals": 0,
+            "credits_earned": 0.0,
+            "available_credits": 0.0,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.referrals.insert_one(referral)
+    
+    return {
+        "referral_code": referral["referral_code"],
+        "referral_link": f"https://retailiq.com/signup?ref={referral['referral_code']}"
+    }
+
+@api_router.get("/referral/stats")
+async def get_referral_stats(user: UserResponse = Depends(get_current_user)):
+    """Get referral statistics for current user"""
+    referral = await db.referrals.find_one({"user_id": user.user_id}, {"_id": 0})
+    
+    if not referral:
+        # Create new referral entry
+        referral_code = generate_referral_code(user.user_id)
+        referral = {
+            "referral_id": f"ref_{uuid.uuid4().hex[:12]}",
+            "user_id": user.user_id,
+            "referral_code": referral_code,
+            "total_referrals": 0,
+            "successful_referrals": 0,
+            "credits_earned": 0.0,
+            "available_credits": 0.0,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.referrals.insert_one(referral)
+    
+    # Get pending referrals count
+    pending_count = await db.referral_history.count_documents({
+        "referrer_id": user.user_id,
+        "status": "pending"
+    })
+    
+    return {
+        "referral_code": referral["referral_code"],
+        "total_referrals": referral.get("total_referrals", 0),
+        "successful_referrals": referral.get("successful_referrals", 0),
+        "pending_referrals": pending_count,
+        "total_credits_earned": referral.get("credits_earned", 0.0),
+        "available_credits": referral.get("available_credits", 0.0),
+        "referral_link": f"https://retailiq.com/signup?ref={referral['referral_code']}"
+    }
+
+@api_router.get("/referral/history")
+async def get_referral_history(user: UserResponse = Depends(get_current_user)):
+    """Get list of referred users"""
+    history = await db.referral_history.find(
+        {"referrer_id": user.user_id}, 
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    return history
+
+@api_router.post("/referral/apply")
+async def apply_referral_code(referral_code: str, user: UserResponse = Depends(get_current_user)):
+    """Apply a referral code during signup (called after user creation)"""
+    # Check if user already has a referrer
+    existing = await db.referral_history.find_one({
+        "referred_user_id": user.user_id
+    }, {"_id": 0})
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Referral code already applied")
+    
+    # Find referrer by code
+    referrer = await db.referrals.find_one({"referral_code": referral_code.upper()}, {"_id": 0})
+    
+    if not referrer:
+        raise HTTPException(status_code=404, detail="Invalid referral code")
+    
+    if referrer["user_id"] == user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot use your own referral code")
+    
+    # Get referrer user info
+    referrer_user = await db.users.find_one({"user_id": referrer["user_id"]}, {"_id": 0})
+    
+    # Create referral history entry
+    await db.referral_history.insert_one({
+        "history_id": f"rh_{uuid.uuid4().hex[:12]}",
+        "referrer_id": referrer["user_id"],
+        "referred_user_id": user.user_id,
+        "referred_user_name": user.name,
+        "referred_user_email": user.email,
+        "referral_code": referral_code.upper(),
+        "status": "pending",  # Will become "completed" after first order
+        "credits_earned": 0.0,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Update referrer stats
+    await db.referrals.update_one(
+        {"user_id": referrer["user_id"]},
+        {"$inc": {"total_referrals": 1}}
+    )
+    
+    # Give referee a welcome credit
+    await db.user_credits.update_one(
+        {"user_id": user.user_id},
+        {
+            "$setOnInsert": {"user_id": user.user_id, "created_at": datetime.now(timezone.utc).isoformat()},
+            "$inc": {"available_credits": REFERRAL_REWARD_REFEREE}
+        },
+        upsert=True
+    )
+    
+    return {
+        "message": f"Referral code applied! You've earned ₹{REFERRAL_REWARD_REFEREE} welcome credit.",
+        "credits_earned": REFERRAL_REWARD_REFEREE,
+        "referrer_name": referrer_user.get("name", "A friend") if referrer_user else "A friend"
+    }
+
+@api_router.post("/referral/complete/{referred_user_id}")
+async def complete_referral(referred_user_id: str):
+    """
+    Called internally when a referred user completes their first order.
+    Awards credits to the referrer.
+    """
+    # Find the referral history entry
+    history = await db.referral_history.find_one({
+        "referred_user_id": referred_user_id,
+        "status": "pending"
+    }, {"_id": 0})
+    
+    if not history:
+        return {"message": "No pending referral found"}
+    
+    # Update history to completed
+    await db.referral_history.update_one(
+        {"referred_user_id": referred_user_id, "status": "pending"},
+        {
+            "$set": {
+                "status": "completed",
+                "credits_earned": REFERRAL_REWARD_REFERRER,
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    # Award credits to referrer
+    await db.referrals.update_one(
+        {"user_id": history["referrer_id"]},
+        {
+            "$inc": {
+                "successful_referrals": 1,
+                "credits_earned": REFERRAL_REWARD_REFERRER,
+                "available_credits": REFERRAL_REWARD_REFERRER
+            }
+        }
+    )
+    
+    return {"message": "Referral completed", "credits_awarded": REFERRAL_REWARD_REFERRER}
+
+@api_router.get("/referral/credits")
+async def get_user_credits(user: UserResponse = Depends(get_current_user)):
+    """Get user's available credits"""
+    credits = await db.user_credits.find_one({"user_id": user.user_id}, {"_id": 0})
+    referral = await db.referrals.find_one({"user_id": user.user_id}, {"_id": 0})
+    
+    user_credits = credits.get("available_credits", 0.0) if credits else 0.0
+    referral_credits = referral.get("available_credits", 0.0) if referral else 0.0
+    
+    return {
+        "total_credits": user_credits + referral_credits,
+        "welcome_credits": user_credits,
+        "referral_credits": referral_credits
+    }
+
+@api_router.post("/referral/redeem")
+async def redeem_credits(data: RedeemCreditsRequest, user: UserResponse = Depends(get_current_user)):
+    """Redeem credits for discount on next order"""
+    credits_info = await get_user_credits(user)
+    
+    if data.amount > credits_info["total_credits"]:
+        raise HTTPException(status_code=400, detail="Insufficient credits")
+    
+    if data.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    
+    # Deduct from referral credits first, then user credits
+    remaining = data.amount
+    
+    referral = await db.referrals.find_one({"user_id": user.user_id}, {"_id": 0})
+    if referral and referral.get("available_credits", 0) > 0:
+        deduct_from_referral = min(remaining, referral["available_credits"])
+        await db.referrals.update_one(
+            {"user_id": user.user_id},
+            {"$inc": {"available_credits": -deduct_from_referral}}
+        )
+        remaining -= deduct_from_referral
+    
+    if remaining > 0:
+        await db.user_credits.update_one(
+            {"user_id": user.user_id},
+            {"$inc": {"available_credits": -remaining}}
+        )
+    
+    # Create redemption record
+    await db.credit_redemptions.insert_one({
+        "redemption_id": f"red_{uuid.uuid4().hex[:12]}",
+        "user_id": user.user_id,
+        "amount": data.amount,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "message": f"₹{data.amount} credits redeemed successfully",
+        "amount_redeemed": data.amount,
+        "remaining_credits": credits_info["total_credits"] - data.amount
+    }
+
+@api_router.get("/referral/leaderboard")
+async def get_referral_leaderboard():
+    """Get top referrers leaderboard"""
+    pipeline = [
+        {"$match": {"successful_referrals": {"$gt": 0}}},
+        {"$sort": {"successful_referrals": -1}},
+        {"$limit": 10},
+        {"$lookup": {
+            "from": "users",
+            "localField": "user_id",
+            "foreignField": "user_id",
+            "as": "user"
+        }},
+        {"$unwind": {"path": "$user", "preserveNullAndEmptyArrays": True}},
+        {"$project": {
+            "_id": 0,
+            "user_id": 1,
+            "name": {"$ifNull": ["$user.name", "Anonymous"]},
+            "successful_referrals": 1,
+            "credits_earned": 1
+        }}
+    ]
+    
+    leaderboard = await db.referrals.aggregate(pipeline).to_list(10)
+    
+    # Add rank
+    for i, entry in enumerate(leaderboard):
+        entry["rank"] = i + 1
+    
+    return leaderboard
+
 # ===================== PRODUCTS ROUTES =====================
 
 @api_router.get("/products", response_model=List[ProductResponse])
@@ -989,6 +1295,11 @@ async def create_order(data: OrderCreate, user: UserResponse = Depends(get_curre
     
     # Send confirmation email
     await send_order_email(user.email, order_doc, "confirmation")
+    
+    # Check if this is user's first order - complete referral if pending
+    order_count = await db.orders.count_documents({"customer_id": user.user_id})
+    if order_count == 1:  # This is their first order
+        await complete_referral(user.user_id)
     
     # Clear cart
     await db.cart_items.delete_many({"user_id": user.user_id})

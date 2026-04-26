@@ -33,7 +33,7 @@ Build RetailIQ - an AI-powered retail management and analytics SaaS platform for
 
 ## What's Been Implemented (Apr 2026)
 
-### Backend (50+ API endpoints)
+### Backend (60+ API endpoints)
 - User authentication (signup, login, Google OAuth)
 - JWT token-based session management
 - Products CRUD API
@@ -46,8 +46,22 @@ Build RetailIQ - an AI-powered retail management and analytics SaaS platform for
 - Cart and Wishlist APIs
 - Analytics endpoints (dashboard stats, sales trends, top products)
 - AI Chat endpoint with Gemini 3 Flash
-- **NEW: Merchant Onboarding APIs**
+- **Merchant Onboarding APIs**
   - POST /api/merchant/send-otp - SMS OTP via Twilio
+  - POST /api/merchant/verify-otp - Verify OTP code
+  - POST /api/merchant/register - Complete merchant registration with KYC
+  - GET /api/merchant/profile - Get merchant profile
+  - GET /api/subscription/plans - Get subscription plans
+  - POST /api/merchant/upload-document - Upload KYC documents
+- **Referral Program APIs (NEW)**
+  - GET /api/referral/my-code - Get/create referral code
+  - GET /api/referral/stats - Get referral statistics
+  - GET /api/referral/history - Get referred users list
+  - POST /api/referral/apply - Apply referral code during signup
+  - POST /api/referral/complete - Complete referral (internal)
+  - GET /api/referral/credits - Get user credits
+  - POST /api/referral/redeem - Redeem credits for discount
+  - GET /api/referral/leaderboard - Get top referrers
   - POST /api/merchant/verify-otp - Verify OTP code
   - POST /api/merchant/register - Complete merchant registration with KYC
   - GET /api/merchant/profile - Get merchant profile
@@ -56,14 +70,21 @@ Build RetailIQ - an AI-powered retail management and analytics SaaS platform for
 
 ### Frontend
 - Landing page with "Partner with Us" CTA and pricing preview
-- **NEW: Pricing page with 3 tiers (Starter/Pro/Enterprise)**
-- **NEW: Merchant Onboarding page (5-step flow)**
+- **Pricing page with 3 tiers (Starter/Pro/Enterprise)**
+- **Merchant Onboarding page (5-step flow)**
   - Phone Verification (OTP)
   - Account Details
   - Business Information
   - KYC Documents (GSTIN, PAN, Bank Details)
   - Plan Selection
-- Auth page (login/signup/Google OAuth)
+- **Referral Program page (NEW)**
+  - Unique referral code with copy/share buttons
+  - Stats cards (total, successful, pending referrals)
+  - Available credits display
+  - Referral history list
+  - Top Referrers leaderboard
+  - "How It Works" section
+- Auth page (login/signup/Google OAuth) with referral code input
 - Admin Dashboard with KPIs and charts (INR)
 - Analytics page with revenue insights
 - Inventory management with add/edit/delete
@@ -76,14 +97,22 @@ Build RetailIQ - an AI-powered retail management and analytics SaaS platform for
 - Wishlist page
 - AI Chatbot (floating widget)
 - Checkout success/cancel pages
-- Responsive sidebar navigation
+- Responsive sidebar navigation with Referrals link
 
 ### Database Collections
 - users, user_sessions, user_roles
 - products, orders, suppliers
 - cart_items, wishlist
 - chat_messages, payment_transactions
-- **NEW: merchants, phone_verifications, otp_requests, kyc_documents**
+- merchants, phone_verifications, otp_requests, kyc_documents
+- **referrals, referral_history, user_credits, credit_redemptions (NEW)**
+
+### Referral Program (NEW)
+- Referrer earns ₹100 when referee completes first order
+- Referee gets ₹50 welcome credit on signup
+- Credits can be redeemed for discounts
+- Leaderboard shows top referrers
+- Referral link format: `retailiq.com/auth?ref=CODE`
 
 ### Subscription Plans
 | Plan | Price | Features |

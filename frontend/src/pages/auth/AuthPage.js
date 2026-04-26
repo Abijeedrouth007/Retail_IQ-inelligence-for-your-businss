@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -14,15 +14,20 @@ import {
   Phone, 
   Loader2,
   ArrowLeft,
-  ShoppingBag
+  ShoppingBag,
+  Gift
 } from 'lucide-react';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const AuthPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, signup, loginWithGoogle } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { login, signup, loginWithGoogle, token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
+  const [referralCode, setReferralCode] = useState('');
 
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [signupData, setSignupData] = useState({ 
@@ -33,6 +38,16 @@ const AuthPage = () => {
   });
 
   const from = location.state?.from?.pathname || '/dashboard';
+
+  // Check for referral code in URL
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      setReferralCode(ref.toUpperCase());
+      setActiveTab('signup'); // Switch to signup tab
+      toast.success(`Referral code ${ref.toUpperCase()} applied! Sign up to get ₹50 credit.`);
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -57,6 +72,27 @@ const AuthPage = () => {
     setLoading(true);
     try {
       await signup(signupData.email, signupData.password, signupData.name, signupData.phone);
+      
+      // Apply referral code if present
+      if (referralCode) {
+        try {
+          const newToken = localStorage.getItem('token');
+          const response = await fetch(`${API_URL}/api/referral/apply?referral_code=${referralCode}`, {
+            method: 'POST',
+            headers: { 
+              'Authorization': `Bearer ${newToken}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          const data = await response.json();
+          if (response.ok) {
+            toast.success(data.message);
+          }
+        } catch (refError) {
+          console.error('Failed to apply referral:', refError);
+        }
+      }
+      
       toast.success('Account created successfully!');
       navigate('/store', { replace: true });
     } catch (error) {
@@ -234,6 +270,27 @@ const AuthPage = () => {
                       data-testid="signup-password-input"
                     />
                   </div>
+                </div>
+
+                {/* Referral Code */}
+                <div className="space-y-2">
+                  <Label htmlFor="referral-code">Referral Code (Optional)</Label>
+                  <div className="relative">
+                    <Gift className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <Input
+                      id="referral-code"
+                      type="text"
+                      placeholder="Enter referral code"
+                      value={referralCode}
+                      onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                      className="pl-10 bg-zinc-950/50 border-zinc-800 uppercase"
+                      maxLength={8}
+                      data-testid="referral-code-input"
+                    />
+                  </div>
+                  {referralCode && (
+                    <p className="text-xs text-teal-400">Get ₹50 credit on signup!</p>
+                  )}
                 </div>
 
                 <Button 
