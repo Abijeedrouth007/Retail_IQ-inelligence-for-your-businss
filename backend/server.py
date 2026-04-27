@@ -25,6 +25,10 @@ def get_cors_origins() -> List[str]:
     )
     return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
+
+def get_cors_origin_regex() -> Optional[str]:
+    return os.environ.get("CORS_ORIGIN_REGEX")
+
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -323,6 +327,39 @@ class RedeemCreditsRequest(BaseModel):
 # Referral reward settings
 REFERRAL_REWARD_REFERRER = 100.0  # ₹100 for referrer when referee completes first order
 REFERRAL_REWARD_REFEREE = 50.0   # ₹50 discount for new user on first order
+
+
+def build_local_chat_response(message: str, user: UserResponse, stats: Optional[DashboardStats]) -> str:
+    prompt = message.lower()
+
+    if stats and any(word in prompt for word in ["dashboard", "summary", "overview", "stats"]):
+        return (
+            f"Here is your current store snapshot: revenue is {CURRENCY_SYMBOL}{stats.total_revenue:,.2f}, "
+            f"today's orders are {stats.today_orders}, active products are {stats.total_products}, "
+            f"and low stock alerts are {stats.low_stock_count}."
+        )
+
+    if stats and any(word in prompt for word in ["stock", "inventory", "reorder"]):
+        if stats.low_stock_count > 0:
+            return (
+                f"You currently have {stats.low_stock_count} low-stock products. "
+                "Start with the low-stock panel in the dashboard and prioritize fast-moving items for reorder."
+            )
+        return "Inventory looks healthy right now. No products are currently below their reorder threshold."
+
+    if stats and any(word in prompt for word in ["sales", "revenue", "orders"]):
+        return (
+            f"Sales are currently at {CURRENCY_SYMBOL}{stats.total_revenue:,.2f} total revenue with "
+            f"{stats.today_orders} orders placed today. The analytics pages can help you compare trends and top products."
+        )
+
+    if any(word in prompt for word in ["customer", "customers"]):
+        return "You can review customer spend and order frequency from the Customers analytics page to spot repeat buyers and inactive accounts."
+
+    return (
+        f"I can help with inventory, sales, customer analytics, and store operations for {user.name}. "
+        "Try asking about revenue, low stock items, customer insights, or a quick dashboard summary."
+    )
 
 # ===================== EMAIL SERVICE =====================
 
@@ -1812,8 +1849,6 @@ async def get_customer_stats(user: UserResponse = Depends(require_admin)):
 
 @api_router.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(data: ChatMessage, user: UserResponse = Depends(get_current_user)):
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    
     session_id = data.session_id or f"chat_{user.user_id}_{uuid.uuid4().hex[:8]}"
     
     # Get context data
@@ -1841,6 +1876,8 @@ Current store stats:
 - Low Stock Alerts: {stats.low_stock_count}"""
     
     try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+
         chat = LlmChat(
             api_key=os.environ.get("EMERGENT_LLM_KEY"),
             session_id=session_id,
@@ -1861,8 +1898,17 @@ Current store stats:
         
         return ChatResponse(response=response, session_id=session_id)
     except Exception as e:
-        logger.error(f"Chat error: {e}")
-        raise HTTPException(status_code=500, detail="AI service unavailable")
+        logger.warning(f"Chat fallback activated: {e}")
+        response = build_local_chat_response(data.message, user, stats)
+        await db.chat_messages.insert_one({
+            "user_id": user.user_id,
+            "session_id": session_id,
+            "message": data.message,
+            "response": response,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "source": "local_fallback"
+        })
+        return ChatResponse(response=response, session_id=session_id)
 
 # ===================== USER MANAGEMENT =====================
 
@@ -2008,6 +2054,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
     allow_origins=get_cors_origins(),
+    allow_origin_regex=get_cors_origin_regex(),
     allow_methods=["*"],
     allow_headers=["*"],
 )
