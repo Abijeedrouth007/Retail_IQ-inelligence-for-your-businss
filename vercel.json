@@ -1,0 +1,22 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install --prefix frontend",
+  "buildCommand": "npm run build --prefix frontend",
+  "outputDirectory": "frontend/build",
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.12",
+      "excludeFiles": "{frontend/**,tests/**,test_reports/**,memory/**,backend_test.py,retailiq_feature_test.py,**/__pycache__/**}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

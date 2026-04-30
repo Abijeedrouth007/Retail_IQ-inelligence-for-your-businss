@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, useConfig } from '../../contexts/ConfigContext';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = process.env.REACT_APP_BACKEND_URL || "";
 
 const statusConfig = {
   pending: { icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/20', label: 'Pending' },

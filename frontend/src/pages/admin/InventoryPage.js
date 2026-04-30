@@ -41,7 +41,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, useConfig } from '../../contexts/ConfigContext';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = process.env.REACT_APP_BACKEND_URL || "";
 
 const InventoryPage = () => {
   const { currencySymbol } = useConfig();

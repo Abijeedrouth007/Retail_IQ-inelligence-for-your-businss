@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/button';
@@ -19,7 +19,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+const API_URL = process.env.REACT_APP_BACKEND_URL || "";
 
 const ReferralPage = () => {
   const { token } = useAuth();
@@ -30,11 +30,7 @@ const ReferralPage = () => {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    fetchReferralData();
-  }, []);
-
-  const fetchReferralData = async () => {
+  const fetchReferralData = useCallback(async () => {
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
       
@@ -54,7 +50,11 @@ const ReferralPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    fetchReferralData();
+  }, [fetchReferralData]);
 
   const copyReferralCode = () => {
     if (stats?.referral_code) {
