@@ -5,7 +5,7 @@
   "outputDirectory": "frontend/build",
   "functions": {
     "api/index.py": {
-      "runtime": "python@3.12",
+      "runtime": "python3.9",
       "excludeFiles": "{frontend/**,tests/**,test_reports/**,memory/**,backend_test.py,retailiq_feature_test.py,**/__pycache__/**}"
     }
   },
